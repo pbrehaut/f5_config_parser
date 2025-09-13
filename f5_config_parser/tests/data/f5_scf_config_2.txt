@@ -1,0 +1,128 @@
+ltm monitor tcp mon-tcp-web {
+    defaults-from tcp
+    interval 10
+    timeout 30
+}
+ltm monitor http mon-http-api {
+    defaults-from http
+    interval 15
+    timeout 45
+    send "GET /health HTTP/1.1\r\nHost: api.example.com\r\n\r\n"
+    receive "OK"
+}
+ltm monitor https mon-https-secure {
+    defaults-from https
+    interval 20
+    timeout 60
+    send "GET /status HTTP/1.1\r\nHost: secure.example.com\r\n\r\n"
+    receive "healthy"
+}
+ltm monitor tcp mon-tcp-orphaned-1 {
+    defaults-from tcp
+    interval 5
+    timeout 15
+}
+ltm monitor http mon-http-orphaned-2 {
+    defaults-from http
+    interval 10
+    timeout 30
+    send "GET /unused HTTP/1.1\r\n\r\n"
+}
+ltm node node-web-used-01 {
+    address 10.0.1.10
+    monitor mon-tcp-web
+}
+ltm node node-web-used-02 {
+    address 10.0.1.11
+    monitor mon-tcp-web
+}
+ltm node node-api-used-01 {
+    address 10.0.2.10
+    monitor mon-http-api
+}
+ltm node node-api-used-02 {
+    address 10.0.2.11
+    monitor mon-http-api
+}
+ltm node node-secure-used-01 {
+    address 10.0.3.10
+    monitor mon-https-secure
+}
+ltm node node-orphaned-1 {
+    address 10.0.9.10
+    monitor mon-tcp-web
+}
+ltm node node-orphaned-2 {
+    address 10.0.9.11
+    monitor mon-http-api
+}
+ltm node node-orphaned-3 {
+    address 10.0.9.12
+}
+ltm pool pool-web-used {
+    monitor mon-tcp-web
+    members {
+        node-web-used-01:80 {
+            address 10.0.1.10
+        }
+        node-web-used-02:80 {
+            address 10.0.1.11
+        }
+    }
+}
+ltm pool pool-api-used {
+    monitor mon-http-api
+    members {
+        node-api-used-01:8080 {
+            address 10.0.2.10
+        }
+        node-api-used-02:8080 {
+            address 10.0.2.11
+        }
+    }
+}
+ltm pool pool-secure-used {
+    monitor mon-https-secure
+    members {
+        node-secure-used-01:443 {
+            address 10.0.3.10
+        }
+    }
+}
+ltm pool pool-orphaned-1 {
+    monitor mon-tcp-web
+    members {
+        node-web-used-01:8080 {
+            address 10.0.1.10
+        }
+    }
+}
+ltm pool pool-orphaned-2 {
+    monitor mon-http-api
+}
+ltm pool pool-orphaned-3 { }
+ltm virtual vs-web-app {
+    destination 192.168.1.100:80
+    pool pool-web-used
+    profiles {
+        tcp { }
+        http { }
+    }
+}
+ltm virtual vs-api-service {
+    destination 192.168.1.101:8080
+    pool pool-api-used
+    profiles {
+        tcp { }
+        http { }
+    }
+}
+ltm virtual vs-secure-app {
+    destination 192.168.1.102:443
+    pool pool-secure-used
+    profiles {
+        tcp { }
+        http { }
+        serverssl { }
+    }
+}

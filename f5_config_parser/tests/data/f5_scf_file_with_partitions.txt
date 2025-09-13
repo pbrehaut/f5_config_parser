@@ -1,0 +1,484 @@
+# TMOS V17
+
+auth partition web-tier {
+    default-route-domain 10
+    description "Web tier partition"
+}
+auth partition app-tier {
+    default-route-domain 20
+    description "Application tier partition"
+}
+auth partition db-tier {
+    default-route-domain 30
+    description "Database tier partition"
+}
+auth partition api-tier {
+    default-route-domain 40
+    description "API tier partition"
+}
+auth partition mgmt-tier {
+    description "Management tier without default route domain"
+}
+ltm monitor http /web-tier/mon-http-basic {
+    defaults-from http
+    interval 30
+    timeout 91
+    send "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n"
+    recv "200 OK"
+}
+ltm monitor http /app-tier/mon-http-custom {
+    defaults-from http
+    interval 15
+    timeout 46
+    send "GET /health HTTP/1.1\r\nHost: app.example.com\r\nUser-Agent: F5-Monitor\r\n\r\n"
+    recv "healthy"
+    recv-disable "maintenance"
+}
+ltm monitor https /web-tier/mon-https-basic {
+    defaults-from https
+    interval 30
+    timeout 91
+    send "GET /status HTTP/1.1\r\nHost: secure.example.com\r\n\r\n"
+    recv "OK"
+}
+ltm monitor https /api-tier/mon-https-ssl-verify {
+    defaults-from https
+    interval 60
+    timeout 181
+    ssl-profile serverssl-basic
+    send "GET /api/health HTTP/1.1\r\nHost: api.example.com\r\n\r\n"
+    recv "\"status\":\"up\""
+}
+ltm monitor tcp /app-tier/mon-tcp-basic {
+    defaults-from tcp
+    interval 10
+    timeout 31
+}
+ltm monitor tcp /app-tier/mon-tcp-custom {
+    defaults-from tcp
+    interval 5
+    timeout 16
+    send "PING"
+    recv "PONG"
+}
+ltm monitor udp /mgmt-tier/mon-udp-basic {
+    defaults-from udp
+    interval 10
+    timeout 31
+}
+ltm monitor dns /mgmt-tier/mon-dns-custom {
+    defaults-from dns
+    interval 20
+    timeout 61
+    qname "example.com"
+    qtype a
+    recv "192.168"
+}
+ltm monitor icmp /web-tier/mon-icmp-basic {
+    defaults-from icmp
+    interval 5
+    timeout 16
+}
+ltm monitor external /mgmt-tier/mon-external-script {
+    defaults-from external
+    interval 30
+    timeout 91
+    args "arg1 arg2"
+    run "/usr/bin/custom-monitor.sh"
+}
+ltm profile http /web-tier/http-basic {
+    defaults-from http
+}
+ltm profile http /web-tier/http-compression {
+    defaults-from http
+    compression gzip
+    compress-prefer-gzip yes
+    compress-min-size 1024
+    compress-buffer-size 4096
+}
+ltm profile http /web-tier/http-xff-headers {
+    defaults-from http
+    insert-xforwarded-for enabled
+    xff-alternative-names { "X-Real-IP" "X-Client-IP" "X-Forwarded-For" }
+    accept-xff enabled
+}
+ltm profile http /app-tier/http-security {
+    defaults-from http
+    redirect-rewrite all
+    security enabled
+    fallback-host "error.example.com"
+    fallback-status-codes { 404 500 502 503 }
+}
+ltm profile http /api-tier/http-oneconnect {
+    defaults-from http
+    oneconnect-transformations enabled
+    response-headers-permitted { "Server" "Date" "Cache-Control" }
+    request-chunking preserve
+}
+ltm profile http /api-tier/http-custom-headers {
+    defaults-from http
+    response-headers-permitted { "X-Custom-Header" "X-App-Version" }
+    request-headers-allowed { "X-API-Key" "Authorization" }
+    header-erase "Server"
+    header-insert "X-Load-Balancer: F5-BIG-IP"
+}
+ltm profile client-ssl /web-tier/clientssl-basic {
+    defaults-from clientssl
+    ciphers "ECDHE+AES-GCM:ECDHE+AES:!aNULL:!MD5:!DSS"
+    options { "no-sslv2" "no-sslv3" "no-tlsv1" }
+}
+ltm profile client-ssl /web-tier/clientssl-strict {
+    defaults-from clientssl
+    ciphers "ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256"
+    options { "no-sslv2" "no-sslv3" "no-tlsv1" "no-tlsv1.1" }
+    secure-renegotiation require-strict
+}
+ltm profile client-ssl /web-tier/clientssl-sni {
+    defaults-from clientssl
+    sni-default yes
+    sni-require yes
+    server-name "*.example.com"
+}
+ltm profile client-ssl /app-tier/clientssl-mutual {
+    defaults-from clientssl
+    authenticate once
+    ca-file ca-bundle.crt
+    client-cert-ca ca-bundle.crt
+    peer-cert-mode require
+}
+ltm profile server-ssl /app-tier/serverssl-basic {
+    defaults-from serverssl
+    server-name "backend.example.com"
+}
+ltm profile server-ssl /app-tier/serverssl-no-verify {
+    defaults-from serverssl
+    ssl-forward-proxy disabled
+    ssl-forward-proxy-bypass disabled
+    peer-cert-mode ignore
+}
+ltm profile server-ssl /api-tier/serverssl-verify {
+    defaults-from serverssl
+    ca-file ca-bundle.crt
+    peer-cert-mode require
+    server-name "secure-backend.example.com"
+}
+ltm profile tcp /web-tier/tcp-lan {
+    defaults-from tcp-lan-optimized
+}
+ltm profile tcp /app-tier/tcp-wan {
+    defaults-from tcp-wan-optimized
+}
+ltm profile tcp /api-tier/tcp-mobile {
+    defaults-from tcp-mobile-optimized
+}
+ltm node /web-tier/node-web-01 {
+    address 10.0.1.10
+    monitor /web-tier/mon-icmp-basic
+}
+ltm node /web-tier/node-web-02 {
+    address 10.0.1.11
+    monitor /app-tier/mon-tcp-basic
+}
+ltm node /web-tier/node-web-03 {
+    address 10.0.1.12
+    monitor /web-tier/mon-http-basic
+}
+ltm node /app-tier/node-app-01 {
+    address 10.0.2.10
+    monitor /app-tier/mon-tcp-custom
+    ratio 2
+}
+ltm node /app-tier/node-app-02 {
+    address 10.0.2.11
+    monitor /app-tier/mon-tcp-custom
+    ratio 1
+}
+ltm node /db-tier/node-db-01 {
+    address 10.0.3.10
+    monitor /app-tier/mon-tcp-basic
+    connection-limit 100
+}
+ltm node /api-tier/node-api-01 {
+    address 10.0.4.10
+    monitor /api-tier/mon-https-ssl-verify
+    rate-limit 1000
+}
+ltm node /api-tier/node-api-02 {
+    address 10.0.4.11
+    monitor /api-tier/mon-https-ssl-verify
+    rate-limit 1000
+}
+ltm node /mgmt-tier/node-dns-01 {
+    address 10.0.5.10
+    monitor /web-tier/mon-icmp-basic
+}
+ltm rule /web-tier/irule-redirect-https {
+when HTTP_REQUEST {
+    if { [HTTP::header exists "X-Forwarded-Proto"] } {
+        if { [HTTP::header "X-Forwarded-Proto"] eq "http" } {
+            HTTP::redirect "https://[HTTP::host][HTTP::uri]"
+        }
+    } elseif { [TCP::local_port] == 80 } {
+        HTTP::redirect "https://[HTTP::host][HTTP::uri]"
+    }
+}
+}
+ltm rule /app-tier/irule-maintenance-page {
+when HTTP_REQUEST {
+    set maintenance_mode [class match [IP::client_addr] equals "maintenance_ips"]
+    if { $maintenance_mode } {
+        HTTP::respond 503 content {
+            <html><body><h1>Service Temporarily Unavailable</h1>
+            <p>The service is currently undergoing maintenance.</p></body></html>
+        } "Content-Type" "text/html"
+    }
+}
+}
+ltm rule /api-tier/irule-custom-headers {
+when HTTP_REQUEST {
+    # Log client information
+    log local0. "Client [IP::client_addr]:[TCP::client_port] requested [HTTP::method] [HTTP::uri]"
+
+    # Add custom request headers
+    HTTP::header insert "X-Client-IP" [IP::client_addr]
+    HTTP::header insert "X-Request-ID" "[expr {int(rand()*1000000)}]-[clock clicks]"
+}
+when HTTP_RESPONSE {
+    # Add security headers
+    HTTP::header insert "X-Content-Type-Options" "nosniff"
+    HTTP::header insert "X-Frame-Options" "DENY"
+    HTTP::header insert "X-XSS-Protection" "1; mode=block"
+
+    # Remove server header
+    HTTP::header remove "Server"
+}
+}
+ltm rule /web-tier/irule-load-balancing {
+when HTTP_REQUEST {
+    switch -glob [string tolower [HTTP::uri]] {
+        "/api/*" {
+            pool /api-tier/pool-api-multi-monitor
+        }
+        "/static/*" {
+            pool /web-tier/pool-web-http
+        }
+        "/app/*" {
+            pool /app-tier/pool-app-tcp
+        }
+        default {
+            # Use default pool from virtual server
+        }
+    }
+}
+}
+ltm pool /web-tier/pool-web-http {
+    monitor /web-tier/mon-http-basic
+    load-balancing-mode round-robin
+    members {
+        /web-tier/node-web-01:80 {
+            address 10.0.1.10
+        }
+        /web-tier/node-web-02:80 {
+            address 10.0.1.11
+        }
+        /web-tier/node-web-03:80 {
+            address 10.0.1.12
+        }
+    }
+}
+ltm pool /web-tier/pool-web-https {
+    monitor /web-tier/mon-https-basic
+    load-balancing-mode least-connections-member
+    members {
+        10.0.1.20:443 {
+            address 10.0.1.20
+        }
+        10.0.1.21:443 {
+            address 10.0.1.21
+        }
+    }
+}
+ltm pool /app-tier/pool-app-tcp {
+    monitor /app-tier/mon-tcp-custom
+    load-balancing-mode fastest-response
+    members {
+        /app-tier/node-app-01:8080 {
+            address 10.0.2.10
+            priority-group 1
+        }
+        /app-tier/node-app-02:8080 {
+            address 10.0.2.11
+            priority-group 1
+        }
+        10.0.2.12:8080 {
+            address 10.0.2.12
+            priority-group 2
+        }
+    }
+}
+ltm pool /db-tier/pool-database {
+    monitor /app-tier/mon-tcp-basic
+    load-balancing-mode least-connections-node
+    members {
+        10.0.3.10:3306 {
+            address 10.0.3.10
+            ratio 2
+        }
+        10.0.3.11:3306 {
+            address 10.0.3.11
+            ratio 1
+        }
+    }
+}
+ltm pool /api-tier/pool-api-multi-monitor {
+    monitor /api-tier/mon-https-ssl-verify and /app-tier/mon-tcp-basic
+    load-balancing-mode weighted-least-connections-member
+    members {
+        /api-tier/node-api-01:443 {
+            address 10.0.4.10
+        }
+        /api-tier/node-api-02:443 {
+            address 10.0.4.11
+        }
+    }
+}
+ltm pool /mgmt-tier/pool-dns {
+    monitor /mgmt-tier/mon-dns-custom
+    load-balancing-mode round-robin
+    members {
+        10.0.5.10:53 {
+            address 10.0.5.10
+        }
+        10.0.5.11:53 {
+            address 10.0.5.11
+        }
+    }
+}
+ltm pool /mgmt-tier/pool-external-monitor {
+    monitor /mgmt-tier/mon-external-script
+    load-balancing-mode ratio-member
+    members {
+        10.0.6.10:80 {
+            address 10.0.6.10
+            ratio 3
+        }
+        10.0.6.11:80 {
+            address 10.0.6.11
+            ratio 1
+        }
+    }
+}
+ltm virtual /web-tier/vs-web-basic {
+    destination 192.168.100.100:80
+    ip-protocol tcp
+    pool /web-tier/pool-web-http
+    profiles {
+        /web-tier/tcp-lan { }
+        /web-tier/http-basic { }
+    }
+    source 0.0.0.0/0
+}
+ltm virtual /web-tier/vs-web-ssl {
+    destination 192.168.100.101:443
+    ip-protocol tcp
+    pool /web-tier/pool-web-https
+    profiles {
+        /app-tier/tcp-wan { }
+        /web-tier/clientssl-basic {
+            context clientside
+        }
+        /app-tier/serverssl-basic {
+            context serverside
+        }
+        /web-tier/http-compression { }
+    }
+    rules {
+        /api-tier/irule-custom-headers
+    }
+    source 0.0.0.0/0
+}
+ltm virtual /web-tier/vs-multi-ssl {
+    destination 192.168.100.102:443
+    ip-protocol tcp
+    pool /web-tier/pool-web-https
+    profiles {
+        /web-tier/tcp-lan { }
+        /web-tier/clientssl-basic {
+            context clientside
+        }
+        /web-tier/clientssl-sni {
+            context clientside
+        }
+        /web-tier/clientssl-strict {
+            context clientside
+        }
+        /api-tier/serverssl-verify {
+            context serverside
+        }
+        /web-tier/http-xff-headers { }
+    }
+    source 0.0.0.0/0
+}
+ltm virtual /app-tier/vs-app-custom {
+    destination 192.168.100.103:8443
+    ip-protocol tcp
+    pool /app-tier/pool-app-tcp
+    profiles {
+        /api-tier/tcp-mobile { }
+        /app-tier/clientssl-mutual {
+            context clientside
+        }
+        /app-tier/serverssl-no-verify {
+            context serverside
+        }
+        /app-tier/http-security { }
+    }
+    source 0.0.0.0/0
+}
+ltm virtual /api-tier/vs-api-gateway {
+    destination 192.168.100.104:443
+    ip-protocol tcp
+    pool /api-tier/pool-api-multi-monitor
+    profiles {
+        /app-tier/tcp-wan { }
+        /web-tier/clientssl-sni {
+            context clientside
+        }
+        /api-tier/serverssl-verify {
+            context serverside
+        }
+        /api-tier/http-oneconnect { }
+        /api-tier/http-custom-headers { }
+    }
+    rules {
+        /app-tier/irule-maintenance-page
+        /web-tier/irule-load-balancing
+    }
+    source 0.0.0.0/0
+}
+ltm virtual /db-tier/vs-database {
+    destination 192.168.100.105:3306
+    ip-protocol tcp
+    pool /db-tier/pool-database
+    profiles {
+        /web-tier/tcp-lan { }
+    }
+    source 0.0.0.0/0
+}
+ltm virtual /mgmt-tier/vs-dns {
+    destination 192.168.100.106:53
+    ip-protocol udp
+    pool /mgmt-tier/pool-dns
+    profiles {
+        udp { }
+    }
+    source 0.0.0.0/0
+}
+ltm virtual vs-no-partition {
+    destination 192.168.100.200:80
+    ip-protocol tcp
+    source 0.0.0.0/0
+}
+ltm pool pool-no-partition {
+    load-balancing-mode round-robin
+}
