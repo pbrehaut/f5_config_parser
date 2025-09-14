@@ -272,6 +272,99 @@ unused_certs = all_certs - used_certs
 print(f"Unused certificates: {[cert.filename for cert in unused_certs]}")
 ```
 
+### Collection Operations - Adding and Removing Stanzas
+
+Collections support standard Python operators for adding and removing stanzas, with all operations being logged to the stanza's change history:
+
+```python
+from f5_config_parser.collection import StanzaCollection
+
+# Load initial collections
+with open('config1.txt') as f:
+    collection1 = StanzaCollection.from_config(f.read())
+with open('config2.txt') as f:
+    collection2 = StanzaCollection.from_config(f.read())
+
+# Create new collection by combining (non-destructive)
+combined = collection1 + collection2  # Creates new collection with both sets
+
+# Add stanzas in-place (modifies existing collection)
+collection1 += collection2  # Adds all stanzas from collection2 to collection1
+
+# Remove stanzas to create new collection
+filtered = collection1 - collection1.filter(prefix=('ltm', 'monitor'))  # New collection without monitors
+
+# Remove stanzas in-place
+collection1 -= collection1.filter(name=re.compile(r'.*-test$'))  # Remove all test objects
+
+# Add individual stanza
+new_pool_config = """
+ltm pool /Common/new-pool {
+    members {
+        /Common/10.0.0.1:80 {
+            address 10.0.0.1
+        }
+    }
+}
+"""
+new_stanza = ConfigStanzaFactory.create_stanza(new_pool_config)
+collection1 += [new_stanza]  # Note: must add as list/collection, not individual stanza
+```
+
+**Renaming Objects:**
+
+```python
+# Rename a stanza by removing, modifying, and re-adding
+vs_to_rename = collection1['ltm virtual /Common/old-name']
+
+# Remove from collection
+collection1 -= [vs_to_rename]
+
+# Modify the name (this changes full_path automatically)
+vs_to_rename.name = '/Common/new-name'
+
+# Update any references in the config_lines
+vs_to_rename.find_and_replace('/Common/old-name', '/Common/new-name')
+
+# Add back to collection (operation is logged in stanza's change history)
+collection1 += [vs_to_rename]
+
+# Verify the rename
+assert 'ltm virtual /Common/new-name' in collection1
+assert 'ltm virtual /Common/old-name' not in collection1
+```
+
+**Selective Merging:**
+
+```python
+# Merge only specific object types from another collection
+source_collection = StanzaCollection.from_config(source_config)
+target_collection = StanzaCollection.from_config(target_config)
+
+# Add only pools and virtual servers from source
+pools_and_vs = source_collection.filter(prefix=('ltm', 'pool'))
+pools_and_vs += source_collection.filter(prefix=('ltm', 'virtual'))
+
+target_collection += pools_and_vs
+
+# Remove outdated objects before adding new ones
+old_profiles = target_collection.filter(name=re.compile(r'.*-v1$'))
+target_collection -= old_profiles
+
+new_profiles = source_collection.filter(name=re.compile(r'.*-v2$'))
+target_collection += new_profiles
+```
+
+**Key Points:**
+
+- **Operators create new collections**: `+` and `-` return new collections without modifying originals
+- **In-place operators modify**: `+=` and `-=` modify the existing collection
+- **Operations are logged**: When stanzas are added to a collection, the operation is recorded in the stanza's change history
+- **Always use lists/collections**: When adding/removing, wrap individual stanzas in a list or use collections
+- **Automatic validation**: Collections prevent duplicate stanzas (same full_path) from being added
+
+This approach enables powerful configuration manipulation workflows while maintaining a complete audit trail of changes.
+
 ### Dependency Analysis
 
 The library automatically discovers relationships between F5 objects:
