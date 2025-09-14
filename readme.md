@@ -17,6 +17,7 @@ A Python library for parsing, analysing, and manipulating F5 BIG-IP configuratio
   - [Finding Pool Members with Specific Priority Groups](#finding-pool-members-with-specific-priority-groups)
   - [Complex Filtering with Set Operations on Single Collections](#complex-filtering-with-set-operations-on-single-collections)
   - [Finding Which Network Objects Contain Pool Members](#finding-which-network-objects-contain-pool-members)
+- [Outputting Configuration](#Outputting-Configuration)
 - [Performance Considerations](#performance-considerations)
 - [Error handling and logging](#error-handling-and-logging)
 - [Requirements](#requirements)
@@ -1116,6 +1117,41 @@ if orphaned_members:
 ```
 
 While get_related_stanzas identifies potential network relationships through dependency analysis, this direct containment testing approach provides definitive answers about which specific network objects actually contain each pool member.
+
+## Outputting Configuration
+
+The library makes it simple to output F5 configuration in its original format by calling `str()` on collections or individual stanzas:
+
+```python
+from f5_config_parser.collection import StanzaCollection
+
+# Load configuration
+with open('f5_config.txt') as f:
+    collection = StanzaCollection.from_config(f.read())
+
+# Output entire collection
+print(collection)  # Prints all stanzas in the collection
+
+# Output individual stanza
+vs = collection['ltm virtual /Common/my-virtual-server']
+print(vs)  # Prints just this virtual server's configuration
+
+# Write to file
+with open('output.conf', 'w') as f:
+    f.write(str(collection))  # Write entire collection
+    # Or for a filtered subset:
+    pools = collection.filter(prefix=('ltm', 'pool'))
+    f.write(str(pools))  # Write only pool configurations
+
+# Get configuration as string for further processing
+config_text = str(collection)  # Returns the configuration as a string
+single_vs_text = str(vs)  # Returns single stanza configuration as a string
+```
+
+This is particularly useful for:
+- Generating deployment scripts with modified configurations
+- Creating backups of specific object types
+- Building configuration templates from existing objects
 
 ## Performance Considerations
 
