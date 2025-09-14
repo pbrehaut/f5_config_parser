@@ -295,23 +295,6 @@ class StanzaCollection:
             raise TypeError(f"Unsupported type for collection operation: {type(items)}. "
                             f"Expected ConfigStanza, List[ConfigStanza], or StanzaCollection.")
 
-    def add(self, stanza: ConfigStanza) -> None:
-        """Add a single stanza to the collection.
-
-        Args:
-            stanza: The ConfigStanza to add
-
-        Raises:
-            DuplicateStanzaError: If a stanza with the same full_path already exists
-        """
-        if stanza.full_path in self:
-            raise DuplicateStanzaError(
-                f"Cannot add stanza with duplicate full_path: {stanza.full_path}. "
-                f"If you want to replace objects with the same name, overwrite the config_lines "
-                f"list attribute in the existing object instead."
-            )
-        self.stanzas.append(stanza)
-
     def filter(self,
                prefix: Optional[Tuple[str, ...]] = None,
                name: Optional[Union[str, re.Pattern]] = None,

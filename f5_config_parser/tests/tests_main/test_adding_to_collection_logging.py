@@ -202,12 +202,9 @@ def test_add_method_logging(mock_print, collection, test_stanzas):
     # Clear existing changes
     stanza2._changes.clear()
 
-    # Add stanza using add() method
-    collection.add(stanza2)
+    collection += stanza2
 
-    # Note: The add() method doesn't currently call log_addition
-    # This test documents current behaviour - you may want to update add() method too
-    assert len(stanza2._changes) == 0
+    assert len(stanza2._changes) == 1
 
 
 def test_logging_preserves_existing_changes(collection, test_stanzas):
