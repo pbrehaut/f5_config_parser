@@ -331,8 +331,8 @@ ltm pool /Common/new-pool {
     }
 }
 """
-new_stanza = ConfigStanzaFactory.create_stanza(new_pool_config)
-collection1 += [new_stanza]  # Note: must add as list/collection, not individual stanza
+new_stanza_collection = StanzaCollection.from_config(new_pool_config)
+collection1 += new_stanza_collection  # Note: must add as list/collection, not individual stanza
 ```
 
 **Renaming Objects:**
