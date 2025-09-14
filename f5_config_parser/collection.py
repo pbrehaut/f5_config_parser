@@ -1,8 +1,6 @@
 from typing import List, Optional, Tuple, Union, Iterator, Dict
 import re
-import json
-import hashlib
-import os
+from f5_config_parser.caching import DependencyCache
 from f5_config_parser.stanza import ConfigStanza
 from f5_config_parser.factory import StanzaFactory
 from f5_config_parser.validate_scf_parsing import validate_config
@@ -21,29 +19,7 @@ class StanzaCollection:
         """Basic constructor - stores stanzas and optional config string"""
         self.stanzas = stanzas
         self.config_str = config_str
-        self._config_hash = None
-        if config_str:
-            self._config_hash = self._calculate_config_hash(config_str)
-
-    def _calculate_config_hash(self, config_str: str) -> str:
-        """Calculate SHA-256 hash of the config string."""
-        return hashlib.sha256(config_str.encode('utf-8')).hexdigest()
-
-    def _get_cache_filename(self, cache_type: str) -> str:
-        """Generate cache filename based on config hash and cache type."""
-        if not self._config_hash:
-            raise ValueError("No config hash available for caching")
-        return f"dependency_cache_{cache_type}_{self._config_hash}.json"
-
-    def _save_dependencies_cache(self, dependencies_data: Dict[str, List[str]], cache_type: str) -> None:
-        """Save dependency data to cache file."""
-        cache_filename = self._get_cache_filename(cache_type)
-        try:
-            with open(cache_filename, 'w') as f:
-                json.dump(dependencies_data, f, indent=2)
-            print(f"Saved {cache_type} cache to {cache_filename}")
-        except Exception as e:
-            print(f"Warning: Failed to save {cache_type} cache: {e}")
+        self._cache = DependencyCache(config_str) if config_str else None
 
     @classmethod
     def from_config(cls,
@@ -103,20 +79,6 @@ class StanzaCollection:
             if hasattr(stanza, '_parse_ips_to_ip_rd'):
                 stanza._parse_ips_to_ip_rd(self)
 
-    def _load_dependencies_cache(self, cache_type: str) -> Optional[Dict[str, List[str]]]:
-        """Load dependency data from cache file if it exists and matches current config hash."""
-        if not self._config_hash:
-            return None
-
-        try:
-            cache_filename = self._get_cache_filename(cache_type)
-            with open(cache_filename, 'r') as f:
-                dependencies_data = json.load(f)
-            print(f"Loaded {cache_type} cache from {cache_filename}")
-            return dependencies_data
-        except (FileNotFoundError, json.JSONDecodeError, Exception) as e:
-            return None
-
     def _initialise_dependencies(self) -> None:
         """Discover and set dependencies for all non-iRule and non-data-group stanzas in the collection.
 
@@ -124,7 +86,9 @@ class StanzaCollection:
         the _dependencies attribute for each stanza, excluding iRule and data-group stanzas.
         """
         # Try to load from cache first
-        cached_dependencies = self._load_dependencies_cache('standard')
+        cached_dependencies = None
+        if self._cache:
+            cached_dependencies = self._cache.load('standard')
 
         if cached_dependencies is not None:
             # Apply cached dependencies to stanzas
@@ -146,9 +110,9 @@ class StanzaCollection:
             dependencies = stanza.get_dependencies(self)
             dependencies_data[stanza.full_path] = dependencies
 
-        # Save dependencies to cache if we have a config hash
-        if self._config_hash:
-            self._save_dependencies_cache(dependencies_data, 'standard')
+        # Save dependencies to cache
+        if self._cache:
+            self._cache.save(dependencies_data, 'standard')
 
     def _initialise_irule_dependencies(self) -> None:
         """Discover and set dependencies for iRule and data-group stanzas in the collection.
@@ -157,14 +121,15 @@ class StanzaCollection:
         the _dependencies attribute for iRule and data-group stanzas only.
         """
         # Try to load from cache first
-        cached_dependencies = self._load_dependencies_cache('irule')
+        cached_dependencies = None
+        if self._cache:
+            cached_dependencies = self._cache.load('irule')
 
         if cached_dependencies is not None:
             # Apply cached dependencies to stanzas
             for stanza in self.stanzas:
-                if stanza.prefix[:2] == ('ltm', 'rule') or stanza.prefix[:2] == ('ltm', 'data-group'):
-                    if stanza.full_path in cached_dependencies:
-                        stanza._dependencies = cached_dependencies[stanza.full_path]
+                if stanza.full_path in cached_dependencies:
+                    stanza._dependencies = cached_dependencies[stanza.full_path]
             return
 
         # Cache miss - calculate dependencies normally
@@ -176,9 +141,9 @@ class StanzaCollection:
                 dependencies = stanza.get_dependencies(self)
                 dependencies_data[stanza.full_path] = dependencies
 
-        # Save dependencies to cache if we have a config hash
-        if self._config_hash:
-            self._save_dependencies_cache(dependencies_data, 'irule')
+        # Save dependencies to cache
+        if self._cache:
+            self._cache.save(dependencies_data, 'irule')
 
     def __len__(self) -> int:
         return len(self.stanzas)
