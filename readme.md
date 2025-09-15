@@ -1274,29 +1274,96 @@ This is particularly useful for:
 
 When working with large F5 configurations, consider these performance optimisations:
 
-### Lazy Initialisation
-When dependency resolution isn't needed immediately:
-```python
-# Skip dependency initialisation for faster loading
-collection = StanzaCollection.from_config(config_text, initialise_dependencies=False)
+### Dependency Caching (Recommended Default)
+The default configuration enables automatic dependency discovery and caching for optimal performance:
 
-# Enable dependency initialisation for irules which is intensive (disabled by default)
-collection = StanzaCollection.from_config(config_text, initialise_irule_dependencies=True)
+```python
+# Recommended: Use defaults for automatic caching
+collection = StanzaCollection.from_config(
+    config_text,
+    initialise_ip_rd=True,           # Default: True - IP/RD resolution
+    initialise_dependencies=True,    # Default: True - Dependency discovery  
+    initialise_irule_dependencies=True  # Default: True - iRule dependencies
+)
+```
+
+**Why keep the defaults?**
+- First run discovers dependencies and saves them to a cache file
+- Subsequent runs on the same config load dependencies from cache (much faster)
+- No performance penalty after initial discovery
+
+### Flexible Dependency Access
+The dependency API automatically handles both cached and uncached states:
+
+```python
+# Works efficiently regardless of cache state
+for stanza in collection:
+    deps = stanza.get_dependencies(collection)  # Auto-discovers if needed, uses cache if available
+    
+# Access cached dependencies without collection parameter
+deps = stanza.get_dependencies()  # Returns cached results
+
+# Force refresh when config scope changes
+deps = stanza.get_dependencies(collection, force_rediscover=True)
+```
+
+### Lazy Initialisation (Special Cases)
+Only disable dependency initialisation for specific performance-critical scenarios:
+
+```python
+# Skip dependency initialisation for faster loading (not recommended for most cases)
+collection = StanzaCollection.from_config(
+    config_text, 
+    initialise_dependencies=False,
+    initialise_irule_dependencies=False
+)
+
+# Manual dependency resolution when needed
+vs = collection.filter(prefix=("ltm", "virtual"), name="my-vs")[0]
+vs_deps = vs.get_dependencies(collection)  # Discovers on first call
 ```
 
 ### Selective Dependency Resolution
-Resolve dependencies only for specific objects:
+For very large configurations, you can work with subsets:
+
 ```python
-# Load without automatic dependency resolution
-collection = StanzaCollection.from_config(config_text, initialise_dependencies=False)
+# Load without automatic dependency resolution (if needed)
+collection = StanzaCollection.from_config(
+    config_text, 
+    initialise_dependencies=False,
+    initialise_irule_dependencies=False
+)
 
 # Resolve dependencies only for specific virtual servers
 important_vs = collection.filter(name=re.compile(r'prod-.*'))
 for vs in important_vs:
-    vs_deps = vs.get_dependencies(collection)
-    # Process dependencies
+    vs_deps = vs.get_dependencies(collection)  # Efficient mixed-state processing
 ```
 
+### Mixed Cache States
+The API efficiently handles collections where some objects have cached dependencies and others don't:
+
+```python
+# This pattern works efficiently even with mixed cache states
+def analyse_virtual_servers(collection):
+    results = []
+    for vs in collection.filter(prefix=("ltm", "virtual")):
+        # Some vs objects may be cached, others not - single API handles both
+        deps = vs.get_dependencies(collection)
+        results.append({
+            'name': vs.name,
+            'dependency_count': len(deps),
+            'dependencies': deps
+        })
+    return results
+```
+
+### Cache File Benefits
+- **First Run**: Dependencies discovered and saved to cache file
+- **Subsequent Runs**: Dependencies loaded from cache (5-10x faster)
+- **Automatic**: No code changes needed, works transparently
+- **Invalidation**: Cache automatically refreshes when config changes
+ 
 ## Error Handling and Logging
 
 The library includes comprehensive validation and logging capabilities to ensure configuration parsing accuracy. Always validate when parsing new F5 configurations to catch potential parsing errors early.
