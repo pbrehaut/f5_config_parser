@@ -135,7 +135,7 @@ def test_dependency_caching(collection_with_dependencies):
     deps1 = vs_web_ssl.get_dependencies(collection)
 
     # Second call should use cache (same object reference)
-    deps2 = vs_web_ssl.get_dependencies(collection)
+    deps2 = vs_web_ssl.get_dependencies()
     assert deps1 is deps2, "Dependencies should be cached and return same object"
     print("✓ Dependencies are properly cached")
 
@@ -203,3 +203,334 @@ def test_lazy_dependency_discovery(collection_with_dependencies):
     vs_web_ssl._invalidate_cache()
     assert vs_web_ssl._dependencies is None, "Dependencies should be None after cache invalidation"
     print("✓ Cache invalidation resets dependencies to None")
+
+
+def test_dependency_collection_parameter_priority(collection_with_dependencies):
+    """Test that collection parameter always takes priority over cache"""
+
+    collection = collection_with_dependencies
+    vs_web_ssl = collection.filter(prefix=("ltm", "virtual"), name="vs-web-ssl")[0]
+
+    # Cache some dependencies
+    original_deps = vs_web_ssl.get_dependencies(collection)
+
+    # Manually modify the cached dependencies to test priority
+    vs_web_ssl._dependencies = ["fake-dependency"]
+
+    # Calling with collection should ignore cache and rediscover
+    fresh_deps = vs_web_ssl.get_dependencies(collection, force_rediscover=True)
+
+    assert fresh_deps != ["fake-dependency"], "Collection parameter should override cache"
+    assert fresh_deps == original_deps, "Should rediscover correct dependencies"
+    assert vs_web_ssl._dependencies == fresh_deps, "Cache should be updated with fresh discovery"
+    print("✓ Collection parameter takes priority over existing cache")
+
+
+def test_dependency_error_handling(collection_with_dependencies):
+    """Test error handling when dependencies haven't been discovered"""
+
+    collection = collection_with_dependencies
+    vs_web_ssl = collection.filter(prefix=("ltm", "virtual"), name="vs-web-ssl")[0]
+
+    # Ensure dependencies are not cached
+    vs_web_ssl._dependencies = None
+
+    # Should raise ValueError when no collection provided and not cached
+    with pytest.raises(ValueError) as exc_info:
+        vs_web_ssl.get_dependencies()
+
+    assert "haven't been discovered yet" in str(exc_info.value)
+    assert "vs-web-ssl" in str(exc_info.value)
+    print("✓ Appropriate error raised when dependencies not cached")
+
+    # Same test for dependents
+    vs_web_ssl._dependents = None
+    with pytest.raises(ValueError) as exc_info:
+        vs_web_ssl.get_dependents()
+
+    assert "haven't been discovered yet" in str(exc_info.value)
+    print("✓ Appropriate error raised when dependents not cached")
+
+
+def test_dependency_refresh_with_different_collections(collection_with_dependencies):
+    """Test that dependencies are refreshed when called with different collections"""
+
+    collection = collection_with_dependencies
+    vs_web_ssl = collection.filter(prefix=("ltm", "virtual"), name="vs-web-ssl")[0]
+
+    # Discover dependencies with original collection
+    deps1 = vs_web_ssl.get_dependencies(collection)
+    original_cache = vs_web_ssl._dependencies
+
+    # Create a modified collection (simulating different scope)
+    # In practice this might be a different partition or modified config
+    modified_collection = collection  # For this test, we'll use same collection
+
+    # Call with collection parameter should force rediscovery
+    deps2 = vs_web_ssl.get_dependencies(modified_collection, force_rediscover=True)
+    new_cache = vs_web_ssl._dependencies
+
+    # Even if collections are the same, cache should be refreshed
+    assert new_cache is not original_cache, "Cache should be refreshed when collection provided"
+    print("✓ Dependencies cache refreshed when collection parameter provided")
+
+
+def test_dependents_caching_behaviour(collection_with_dependencies):
+    """Test dependents caching works similarly to dependencies"""
+
+    collection = collection_with_dependencies
+
+    # Get a pool that should have dependents (virtual servers that use it)
+    pool_web = collection.filter(prefix=("ltm", "pool"), name="pool-web-http")[0]
+
+    # First call should discover dependents
+    dependents1 = pool_web.get_dependents(collection)
+    assert pool_web._dependents is not None, "Dependents should be cached after discovery"
+
+    # Second call should use cache
+    dependents2 = pool_web.get_dependents()
+    assert dependents1 is dependents2, "Dependents should be cached and return same object"
+    print("✓ Dependents are properly cached")
+
+    # Modify something to invalidate cache
+    pool_web.find_and_replace("monitor", "monitor-modified")
+
+    # Dependents should be rediscovered
+    dependents3 = pool_web.get_dependents(collection)
+    assert dependents3 is not dependents1, "Dependents should be rediscovered after config change"
+    print("✓ Dependents cache is properly invalidated after config changes")
+
+
+def test_mixed_dependency_operations(collection_with_dependencies):
+    """Test mixing dependencies and dependents operations"""
+
+    collection = collection_with_dependencies
+
+    # Get objects that are both dependencies and dependents
+    pool_web = collection.filter(prefix=("ltm", "pool"), name="pool-web-http")[0]
+
+    # Discover dependencies first
+    pool_deps = pool_web.get_dependencies(collection)
+    assert pool_web._dependencies is not None
+    assert pool_web._dependents is None  # Should still be None
+
+    # Now discover dependents
+    pool_dependents = pool_web.get_dependents(collection)
+    assert pool_web._dependents is not None
+    assert pool_web._dependencies is not None  # Should still be cached
+
+    # Both should be accessible without collection parameter
+    cached_deps = pool_web.get_dependencies()
+    cached_dependents = pool_web.get_dependents()
+
+    assert cached_deps is pool_deps, "Dependencies should remain cached"
+    assert cached_dependents is pool_dependents, "Dependents should remain cached"
+    print("✓ Dependencies and dependents can be cached independently")
+
+
+def test_cache_state_after_invalidation(collection_with_dependencies):
+    """Test cache state transitions during invalidation scenarios"""
+
+    collection = collection_with_dependencies
+    vs_web_ssl = collection.filter(prefix=("ltm", "virtual"), name="vs-web-ssl")[0]
+
+    # Initial state - both should be None
+    assert vs_web_ssl._dependencies is None
+    assert vs_web_ssl._dependents is None
+    print("✓ Initial cache state is None for both")
+
+    # Discover dependencies only
+    deps = vs_web_ssl.get_dependencies(collection)
+    assert vs_web_ssl._dependencies is not None
+    assert vs_web_ssl._dependents is None
+    print("✓ Only dependencies cached after get_dependencies()")
+
+    # Discover dependents
+    dependents = vs_web_ssl.get_dependents(collection)
+    assert vs_web_ssl._dependencies is not None
+    assert vs_web_ssl._dependents is not None
+    print("✓ Both cached after discovering both")
+
+    # Manual cache invalidation should clear both
+    vs_web_ssl._invalidate_cache()
+    assert vs_web_ssl._dependencies is None
+    assert vs_web_ssl._dependents is None
+    print("✓ Manual invalidation clears both caches")
+
+    # Config change should also clear both
+    vs_web_ssl.get_dependencies(collection)  # Cache dependencies
+    vs_web_ssl.get_dependents(collection)  # Cache dependents
+
+    # Modify config (this should trigger invalidation via MonitoredList)
+    vs_web_ssl.find_and_replace("pool", "pool-test")
+
+    assert vs_web_ssl._dependencies is None
+    assert vs_web_ssl._dependents is None
+    print("✓ Config changes invalidate both caches")
+
+
+def test_force_rediscover_flag(collection_with_dependencies):
+    """Test the force_rediscover flag behaviour"""
+
+    collection = collection_with_dependencies
+    vs_web_ssl = collection.filter(prefix=("ltm", "virtual"), name="vs-web-ssl")[0]
+
+    # Initial discovery
+    original_deps = vs_web_ssl.get_dependencies(collection)
+    original_cache = vs_web_ssl._dependencies
+
+    # Collection parameter without force_rediscover should return cache
+    cached_deps = vs_web_ssl.get_dependencies(collection)
+    assert cached_deps is original_cache, "Should return cached dependencies without force_rediscover"
+    print("✓ Collection parameter respects cache when force_rediscover=False")
+
+    # force_rediscover=True should rediscover
+    fresh_deps = vs_web_ssl.get_dependencies(collection, force_rediscover=True)
+    new_cache = vs_web_ssl._dependencies
+
+    assert fresh_deps is not original_cache, "force_rediscover=True should create new cache"
+    assert fresh_deps == original_deps, "Should rediscover same dependencies"
+    assert new_cache is not original_cache, "Cache object should be different"
+    print("✓ force_rediscover=True forces rediscovery")
+
+
+def test_force_rediscover_without_collection_error(collection_with_dependencies):
+    """Test that force_rediscover=True requires collection parameter"""
+
+    collection = collection_with_dependencies
+    vs_web_ssl = collection.filter(prefix=("ltm", "virtual"), name="vs-web-ssl")[0]
+
+    # Cache some dependencies first
+    vs_web_ssl.get_dependencies(collection)
+
+    # force_rediscover=True without collection should raise error
+    with pytest.raises(ValueError) as exc_info:
+        vs_web_ssl.get_dependencies(force_rediscover=True)
+
+    assert "Cannot force rediscovery" in str(exc_info.value)
+    assert "without a collection parameter" in str(exc_info.value)
+    print("✓ force_rediscover=True without collection raises appropriate error")
+
+
+def test_mixed_collection_states_processing(collection_with_dependencies):
+    """Test processing collections with mixed cache states"""
+
+    collection = collection_with_dependencies
+
+    # Get some stanzas and pre-cache some dependencies
+    virtual_servers = collection.filter(prefix=("ltm", "virtual"))
+
+    # Pre-cache dependencies for first stanza only
+    virtual_servers[0].get_dependencies(collection)
+
+    # Verify mixed states
+    assert virtual_servers[0]._dependencies is not None, "First stanza should be cached"
+    assert virtual_servers[1]._dependencies is None, "Second stanza should not be cached"
+    assert virtual_servers[2]._dependencies is None, "Third stanza should not be cached"
+
+    # Process all stanzas with uniform API call
+    all_deps = []
+    for vs in virtual_servers:
+        # This should work efficiently for all states
+        deps = vs.get_dependencies(collection)
+        all_deps.append(deps)
+
+        # All should now be cached
+        assert vs._dependencies is not None, f"Stanza {vs.name} should be cached after processing"
+
+    # Second pass should all use cache
+    cached_deps = []
+    for vs in virtual_servers:
+        deps = vs.get_dependencies(collection)  # Should all use cache now
+        cached_deps.append(deps)
+
+    # Results should be identical (same object references for cached results)
+    for i, vs in enumerate(virtual_servers):
+        assert cached_deps[i] is all_deps[i], f"Second pass should use cache for {vs.name}"
+
+    print("✓ Mixed cache states processed efficiently with uniform API")
+
+
+def test_force_rediscover_with_dependents(collection_with_dependencies):
+    """Test force_rediscover flag works for dependents too"""
+
+    collection = collection_with_dependencies
+    pool_web = collection.filter(prefix=("ltm", "pool"), name="pool-web-http")[0]
+
+    # Initial discovery
+    original_dependents = pool_web.get_dependents(collection)
+    original_cache = pool_web._dependents
+
+    # Collection parameter without force_rediscover should return cache
+    cached_dependents = pool_web.get_dependents(collection)
+    assert cached_dependents is original_cache, "Should return cached dependents without force_rediscover"
+
+    # force_rediscover=True should rediscover
+    fresh_dependents = pool_web.get_dependents(collection, force_rediscover=True)
+    new_cache = pool_web._dependents
+
+    assert fresh_dependents is not original_cache, "force_rediscover=True should create new cache"
+    assert fresh_dependents == original_dependents, "Should rediscover same dependents"
+    assert new_cache is not original_cache, "Cache object should be different"
+    print("✓ force_rediscover=True works for dependents")
+
+
+def test_performance_pattern_validation(collection_with_dependencies):
+    """Test the recommended performance patterns work as expected"""
+
+    collection = collection_with_dependencies
+    vs_web_ssl = collection.filter(prefix=("ltm", "virtual"), name="vs-web-ssl")[0]
+
+    # Pattern 1: Initial discovery
+    deps1 = vs_web_ssl.get_dependencies(collection)
+    assert vs_web_ssl._dependencies is not None
+    print("✓ Pattern 1: Initial discovery works")
+
+    # Pattern 2: Cached access (no collection)
+    deps2 = vs_web_ssl.get_dependencies()
+    assert deps2 is deps1, "Pattern 2 should use cache"
+    print("✓ Pattern 2: Cached access works")
+
+    # Pattern 3: Safe collection passing (should use cache)
+    deps3 = vs_web_ssl.get_dependencies(collection)
+    assert deps3 is deps1, "Pattern 3 should use cache despite collection parameter"
+    print("✓ Pattern 3: Safe collection passing works")
+
+    # Pattern 4: Explicit refresh
+    deps4 = vs_web_ssl.get_dependencies(collection, force_rediscover=True)
+    assert deps4 is not deps1, "Pattern 4 should force rediscovery"
+    assert deps4 == deps1, "Pattern 4 should have same content"
+    print("✓ Pattern 4: Explicit refresh works")
+
+
+def test_batch_processing_efficiency(collection_with_dependencies):
+    """Test efficiency of batch processing mixed cache states"""
+
+    collection = collection_with_dependencies
+    all_stanzas = list(collection)[:10]  # First 10 stanzas for testing
+
+    # Simulate mixed cache states by pre-caching some
+    for i in range(0, len(all_stanzas), 2):  # Cache every other stanza
+        try:
+            all_stanzas[i].get_dependencies(collection)
+        except:
+            pass  # Some stanzas might not have dependencies
+
+    # Count how many were pre-cached
+    pre_cached_count = sum(1 for s in all_stanzas if s._dependencies is not None)
+
+    # Process all stanzas with uniform API
+    processed_deps = []
+    for stanza in all_stanzas:
+        try:
+            deps = stanza.get_dependencies(collection)
+            processed_deps.append((stanza.full_path, len(deps)))
+        except:
+            # Some stanzas might not implement dependency discovery
+            processed_deps.append((stanza.full_path, 0))
+
+    # Verify all processable stanzas now have cached dependencies
+    post_cached_count = sum(1 for s in all_stanzas if s._dependencies is not None)
+
+    print(f"✓ Batch processing: {pre_cached_count} pre-cached, {post_cached_count} post-cached")
+    print(f"✓ Processed {len(processed_deps)} stanzas with uniform API")

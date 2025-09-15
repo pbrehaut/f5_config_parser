@@ -114,12 +114,6 @@ class ConfigStanza:
         """Override in subclasses to implement specific dependency discovery"""
         return []
 
-    def get_dependencies(self, collection: 'StanzaCollection') -> List[str]:
-        """Get dependencies (automatically discovers if needed)"""
-        if self._dependencies is None:
-            self._dependencies = self._discover_dependencies(collection)
-        return self._dependencies
-
     def _discover_dependents(self, collection: 'StanzaCollection') -> List[str]:
         """Find all objects in the collection that depend on this stanza"""
         dependents = []
@@ -130,10 +124,90 @@ class ConfigStanza:
                     dependents.append(stanza.full_path)
         return dependents
 
-    def get_dependents(self, collection: 'StanzaCollection') -> List[str]:
-        """Get dependents (automatically discovers if needed)"""
-        if self._dependents is None:
+    def get_dependencies(self, collection: Optional['StanzaCollection'] = None,
+                         force_rediscover: bool = False) -> List[str]:
+        """
+        Get dependencies with flexible caching behaviour.
+
+        Args:
+            collection: Optional collection to discover dependencies against.
+                       Required for initial discovery or when force_rediscover=True.
+            force_rediscover: If True, forces rediscovery even if dependencies are cached.
+                             If False and dependencies are cached, returns cached result
+                             regardless of collection parameter.
+
+        Returns:
+            List of dependency full paths
+
+        Raises:
+            ValueError: If dependencies haven't been discovered and no collection provided,
+                       or if force_rediscover=True but no collection provided.
+        """
+        if force_rediscover:
+            if collection is None:
+                raise ValueError(
+                    f"Cannot force rediscovery for '{self.full_path}' without a collection parameter."
+                )
+            # Force rediscovery with collection
+            self._dependencies = self._discover_dependencies(collection)
+            return self._dependencies
+
+        # If cached, return cache regardless of collection parameter
+        if self._dependencies is not None:
+            return self._dependencies
+
+        # Not cached - need collection to discover
+        if collection is None:
+            raise ValueError(
+                f"Dependencies for '{self.full_path}' haven't been discovered yet. "
+                "Call with a collection parameter first."
+            )
+
+        # Discover and cache
+        self._dependencies = self._discover_dependencies(collection)
+        return self._dependencies
+
+    def get_dependents(self, collection: Optional['StanzaCollection'] = None,
+                       force_rediscover: bool = False) -> List[str]:
+        """
+        Get dependents with flexible caching behaviour.
+
+        Args:
+            collection: Optional collection to discover dependents against.
+                       Required for initial discovery or when force_rediscover=True.
+            force_rediscover: If True, forces rediscovery even if dependents are cached.
+                             If False and dependents are cached, returns cached result
+                             regardless of collection parameter.
+
+        Returns:
+            List of dependent full paths
+
+        Raises:
+            ValueError: If dependents haven't been discovered and no collection provided,
+                       or if force_rediscover=True but no collection provided.
+        """
+        if force_rediscover:
+            if collection is None:
+                raise ValueError(
+                    f"Cannot force rediscovery for '{self.full_path}' without a collection parameter."
+                )
+            # Force rediscovery with collection
             self._dependents = self._discover_dependents(collection)
+            return self._dependents
+
+        # If cached, return cache regardless of collection parameter
+        if self._dependents is not None:
+            return self._dependents
+
+        # Not cached - need collection to discover
+        if collection is None:
+            raise ValueError(
+                f"Dependents for '{self.full_path}' haven't been discovered yet. "
+                "Call with a collection parameter first."
+            )
+
+        # Discover and cache
+        self._dependents = self._discover_dependents(collection)
         return self._dependents
 
     @property
