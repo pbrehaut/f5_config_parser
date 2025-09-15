@@ -202,7 +202,8 @@ def test_add_method_logging(mock_print, collection, test_stanzas):
     # Clear existing changes
     stanza2._changes.clear()
 
-    collection += stanza2
+    # Add stanza
+    collection += [stanza2]
 
     assert len(stanza2._changes) == 1
 

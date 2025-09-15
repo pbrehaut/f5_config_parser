@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple, Union, Dict, Any, ClassVar
+from typing import List, Optional, Tuple, Union, Dict, Any, Literal
 import re
 import uuid
 from datetime import datetime
@@ -165,7 +165,7 @@ class ConfigStanza:
     def find_and_replace(self,
                          search_pattern: Union[str, re.Pattern],
                          replacement: str,
-                         match_type: str = "word_boundary",
+                         match_type: Literal["word_boundary", "substring", "whole_line"] = "word_boundary",
                          change_id: Optional[str] = None) -> int:
         """Find and replace text in configuration lines, logging changes via the MonitoredList."""
         if change_id is None:

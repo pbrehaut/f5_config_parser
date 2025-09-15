@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple, Union, Iterator, Dict
+from typing import List, Optional, Tuple, Union, Iterator, Dict, Literal
 import re
 from f5_config_parser.caching import DependencyCache
 from f5_config_parser.stanza import ConfigStanza
@@ -383,7 +383,7 @@ class StanzaCollection:
         return None
 
     def get_related_stanzas(self, initial_stanzas: List[ConfigStanza],
-                            relation_type: str = 'dependencies') -> 'StanzaCollection':
+                            relation_type: Literal['dependencies', 'dependents'] = 'dependencies') -> 'StanzaCollection':
         """
         Recursively discover all stanzas related to the initial set through dependencies or dependents.
 
