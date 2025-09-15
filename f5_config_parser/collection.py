@@ -26,7 +26,7 @@ class StanzaCollection:
                     config_text: str,
                     initialise_ip_rd: bool = True,
                     initialise_dependencies: bool = True,
-                    initialise_irule_dependencies: bool = False) -> 'StanzaCollection':
+                    initialise_irule_dependencies: bool = True) -> 'StanzaCollection':
         """Create collection from config text with full initialisation options"""
         if not config_text.strip():
             raise ValueError("Empty config string provided")
