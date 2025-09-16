@@ -90,9 +90,9 @@ class TestDependencyCache:
 
     def test_get_cache_filename(self, cache_with_temp_dir, temp_cache_dir):
         """Test cache filename generation"""
-        filename = cache_with_temp_dir._get_cache_filename("standard")
+        filename = cache_with_temp_dir._get_cache_filename("dependencies")
 
-        expected_filename = f"dependency_cache_standard_{cache_with_temp_dir.config_hash}.json"
+        expected_filename = f"cache_dependencies_{cache_with_temp_dir.config_hash}.json"
         expected_path = os.path.join(temp_cache_dir, expected_filename)
 
         assert filename == expected_path
