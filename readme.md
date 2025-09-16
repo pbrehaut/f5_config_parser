@@ -115,7 +115,11 @@ collection += certificates
 
 # Now SSL profiles can resolve dependencies to certificates
 ssl_profile = collection['ltm profile client-ssl /Common/my-ssl-profile']
-cert_dependencies = ssl_profile.get_dependencies(collection)
+
+# force_rediscover is required here as the dependencies already would have been initialised when the config was loaded and needs to be refreshed 
+# now that the certificates have been added. Alternatively initialise dependencies could be rerun on the entire collection, 
+# see performance consideration section below, and certificate add example.
+cert_dependencies = ssl_profile.get_dependencies(collection, force_rediscover=True)
 cert_objects = collection.get_related_stanzas([ssl_profile], 'dependencies').filter(prefix=("certificate", "object"))
 
 print(f"SSL profile uses certificates: {[cert.filename for cert in cert_objects]}")
@@ -1275,30 +1279,26 @@ This is particularly useful for:
 - Building configuration templates from existing objects
 
 ## Performance Considerations
-
 When working with large F5 configurations, consider these performance optimisations:
 
 ### Dependency Caching (Recommended Default)
 The default configuration enables automatic dependency discovery and caching for optimal performance:
-
 ```python
 # Recommended: Use defaults for automatic caching
 collection = StanzaCollection.from_config(
     config_text,
     initialise_ip_rd=True,           # Default: True - IP/RD resolution
-    initialise_dependencies=True,    # Default: True - Dependency discovery  
-    initialise_irule_dependencies=True  # Default: True - iRule dependencies
+    initialise_dependencies=True,    # Default: True - Dependency discovery for all stanzas
 )
 ```
-
 **Why keep the defaults?**
 - First run discovers dependencies and saves them to a cache file
 - Subsequent runs on the same config load dependencies from cache (much faster)
+- Cache automatically detects when new objects are added and refreshes accordingly
 - No performance penalty after initial discovery
 
 ### Flexible Dependency Access
 The dependency API automatically handles both cached and uncached states:
-
 ```python
 # Works efficiently regardless of cache state
 for stanza in collection:
@@ -1313,13 +1313,11 @@ deps = stanza.get_dependencies(collection, force_rediscover=True)
 
 ### Lazy Initialisation (Special Cases)
 Only disable dependency initialisation for specific performance-critical scenarios:
-
 ```python
 # Skip dependency initialisation for faster loading (not recommended for most cases)
 collection = StanzaCollection.from_config(
     config_text, 
     initialise_dependencies=False,
-    initialise_irule_dependencies=False
 )
 
 # Manual dependency resolution when needed
@@ -1329,13 +1327,11 @@ vs_deps = vs.get_dependencies(collection)  # Discovers on first call
 
 ### Selective Dependency Resolution
 For very large configurations, you can work with subsets:
-
 ```python
 # Load without automatic dependency resolution (if needed)
 collection = StanzaCollection.from_config(
     config_text, 
     initialise_dependencies=False,
-    initialise_irule_dependencies=False
 )
 
 # Resolve dependencies only for specific virtual servers
@@ -1344,28 +1340,33 @@ for vs in important_vs:
     vs_deps = vs.get_dependencies(collection)  # Efficient mixed-state processing
 ```
 
-### Mixed Cache States
-The API efficiently handles collections where some objects have cached dependencies and others don't:
-
+### Adding Objects After Initial Load
+When you add stanzas to an existing collection, you can reinitialise dependencies to include the new objects:
 ```python
-# This pattern works efficiently even with mixed cache states
-def analyse_virtual_servers(collection):
-    results = []
-    for vs in collection.filter(prefix=("ltm", "virtual")):
-        # Some vs objects may be cached, others not - single API handles both
-        deps = vs.get_dependencies(collection)
-        results.append({
-            'name': vs.name,
-            'dependency_count': len(deps),
-            'dependencies': deps
-        })
-    return results
+# Load initial configuration with caching
+with open(INPUT_FILE) as f:
+    all_stanzas = StanzaCollection.from_config(f.read())
+
+# Add certificate objects from external source
+certificates = load_certificates_from_tar(TAR_FILE)
+all_stanzas += certificates
+
+# Reinitialise dependencies to include certificate objects
+all_stanzas.initialise_dependencies()  # Detects new objects, recalculates all dependencies, saves to cache
 ```
+
+**What happens during reinitialisation:**
+- Cache coverage check detects the new certificate objects aren't cached
+- All dependencies are recalculated (existing + new objects)
+- Updated dependency data is saved to cache automatically
+- Next program run will load all dependencies (including certificates) from cache
+- SSL profiles, virtual servers, and other objects will now show certificate dependencies
 
 ### Cache File Benefits
 - **First Run**: Dependencies discovered and saved to cache file
 - **Subsequent Runs**: Dependencies loaded from cache (5-10x faster)
-- **Automatic**: No code changes needed, works transparently
+- **Automatic Coverage Detection**: Cache refreshes when new objects are added
+- **Unified Processing**: All dependency types (including iRules) cached together
 - **Invalidation**: Cache automatically refreshes when config changes
  
 ## Error Handling and Logging
