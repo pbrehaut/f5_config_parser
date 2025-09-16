@@ -41,6 +41,7 @@ class StanzaCollection:
 
         if initialise_dependencies:
             collection.initialise_dependencies()
+            collection.save_dependency_cache()
 
         return collection
 
@@ -57,6 +58,7 @@ class StanzaCollection:
 
         if initialise_dependencies:
             collection.initialise_dependencies()
+            collection.save_dependency_cache()
 
         return collection
 
@@ -71,7 +73,7 @@ class StanzaCollection:
             if hasattr(stanza, '_parse_ips_to_ip_rd'):
                 stanza._parse_ips_to_ip_rd(self)
 
-    def initialise_dependencies(self, ignore_cache: bool = False, save_cache: bool = True) -> None:
+    def initialise_dependencies(self, ignore_cache: bool = False) -> None:
         """Discover and set dependencies for all stanzas in the collection.
 
         Uses collection context to resolve object references and populate
@@ -79,17 +81,16 @@ class StanzaCollection:
 
         Args:
             ignore_cache: If True, bypass cache loading and recalculate all dependencies
-            save_cache: If True, save calculated dependencies to cache
         """
         # Get paths for stanzas we need to process
-        standard_paths = {stanza.full_path for stanza in self.stanzas}
+        stanza_paths = {stanza.full_path for stanza in self.stanzas}
 
         # Check cache coverage unless ignoring cache
         use_cache = False
         cached_dependencies = None
 
-        if not ignore_cache and self._cache and standard_paths:
-            if self._cache.check_coverage(standard_paths, 'dependencies'):
+        if not ignore_cache and self._cache and stanza_paths:
+            if self._cache.check_coverage(stanza_paths, 'dependencies'):
                 cached_dependencies = self._cache.load('dependencies')
                 if cached_dependencies is not None:
                     use_cache = True
@@ -102,15 +103,29 @@ class StanzaCollection:
             return
 
         # Cache miss, incomplete coverage, or ignoring cache - calculate dependencies
-        dependencies_data = {}
-
         for stanza in self.stanzas:
             # Discover dependencies for all stanzas
             dependencies = stanza.get_dependencies(self, force_rediscover=True)
-            dependencies_data[stanza.full_path] = dependencies
+            stanza._dependencies = dependencies
 
-        # Save dependencies to cache if requested
-        if save_cache and self._cache:
+    def save_dependency_cache(self) -> None:
+        """Save current dependency state to cache.
+
+        Saves the current _dependencies attribute of all stanzas to the cache file.
+        Only saves if cache is available and stanzas have dependencies initialised.
+        """
+        if not self._cache:
+            return
+
+        # Collect current dependency state from all stanzas
+        dependencies_data = {}
+
+        for stanza in self.stanzas:
+            if hasattr(stanza, '_dependencies') and stanza._dependencies is not None:
+                dependencies_data[stanza.full_path] = stanza._dependencies
+
+        # Only save if we have dependency data
+        if dependencies_data:
             self._cache.save(dependencies_data, 'dependencies')
 
     def __len__(self) -> int:
