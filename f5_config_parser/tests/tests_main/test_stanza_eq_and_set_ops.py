@@ -224,7 +224,7 @@ class TestAdvancedSetOperations:
         # Convert to sets for intersection
         stanza_set = set(collection1)
         filtered_stanzas = stanza_set & target_names
-        filtered_collection = StanzaCollection.from_stanzas([collection1[x] for x in filtered_stanzas])
+        filtered_collection = StanzaCollection([collection1[x] for x in filtered_stanzas])
 
         assert len(filtered_collection) == 2
         full_paths = {s.full_path for s in filtered_collection}

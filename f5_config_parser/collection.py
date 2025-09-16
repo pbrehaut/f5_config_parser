@@ -24,41 +24,29 @@ class StanzaCollection:
     @classmethod
     def from_config(cls,
                     config_text: str,
-                    initialise_ip_rd: bool = True,
-                    initialise_dependencies: bool = True) -> 'StanzaCollection':
-        """Create collection from config text with full initialisation options"""
+                    initialise: bool = True,  # Keep True as default for main entry point
+                    validate: bool = True) -> 'StanzaCollection':
+        """Create collection from config text with optional full initialisation.
+
+        This is the primary entry point for creating a StanzaCollection.
+
+        Args:
+            config_text: Raw F5 configuration text
+            initialise: If True, run full initialisation (ip_rd + dependencies)
+            validate: If True, validate the parsed configuration
+        """
         if not config_text.strip():
             raise ValueError("Empty config string provided")
 
         parsed_stanzas = StanzaFactory.parse_stanzas(config_text)
         collection = cls(parsed_stanzas, config_text)
 
-        # Validate parsed config
-        validate_config(config_text, collection)
+        if validate:
+            validate_config(config_text, collection)
 
-        if initialise_ip_rd:
+        if initialise:
             collection.initialise_ip_to_rd()
-
-        if initialise_dependencies:
             collection.initialise_dependencies()
-            collection.save_dependency_cache()
-
-        return collection
-
-    @classmethod
-    def from_stanzas(cls,
-                     stanzas: List[ConfigStanza],
-                     initialise_ip_rd: bool = False,
-                     initialise_dependencies: bool = False) -> 'StanzaCollection':
-        """Create collection from existing stanzas with optional initialisation"""
-        collection = cls(stanzas)
-
-        if initialise_ip_rd:
-            collection.initialise_ip_to_rd()
-
-        if initialise_dependencies:
-            collection.initialise_dependencies()
-            collection.save_dependency_cache()
 
         return collection
 

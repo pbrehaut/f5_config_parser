@@ -13,7 +13,7 @@ def collection_with_dependencies():
 
     # Load the configuration
     f5_config = StanzaCollection.from_config(config_text,
-                                             initialise_dependencies=False)
+                                             initialise=False)
 
     # Convert to collection for dependency resolution
     collection = f5_config
