@@ -1,7 +1,7 @@
 import hashlib
 import json
 import os
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 
 class DependencyCache:
@@ -24,7 +24,7 @@ class DependencyCache:
 
     def _get_cache_filename(self, cache_type: str) -> str:
         """Generate cache filename based on config hash and cache type"""
-        filename = f"dependency_cache_{cache_type}_{self.config_hash}.json"
+        filename = f"cache_{cache_type}_{self.config_hash}.json"
         return os.path.join(self.cache_dir, filename)
 
     def load(self, cache_type: str) -> Optional[Dict[str, List[str]]]:
@@ -47,3 +47,20 @@ class DependencyCache:
             print(f"Saved {cache_type} cache to {cache_filename}")
         except Exception as e:
             print(f"Warning: Failed to save {cache_type} cache: {e}")
+
+    def check_coverage(self, collection_paths: Set[str], cache_type: str) -> bool:
+        """Check if cache covers all paths in the collection.
+
+        Args:
+            collection_paths: Set of full_path values from stanzas in the collection
+            cache_type: Type of cache to check ('standard' or 'irule')
+
+        Returns:
+            True if cache covers all collection paths, False otherwise
+        """
+        cached_data = self.load(cache_type)
+        if cached_data is None:
+            return False
+
+        cached_paths = set(cached_data.keys())
+        return collection_paths.issubset(cached_paths)

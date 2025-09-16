@@ -95,6 +95,8 @@ ssl_profiles = collection.filter(prefix=("ltm", "profile"), content="ssl")
 
 # Analyse dependencies
 dependencies = vs.get_dependencies(collection)
+# or dependencies = vs.get_dependencies(collection) # Call with collection object if not initialised already.
+# or dependencies = vs.get_dependencies(collection, force_rediscover=True) # Call with collection object and force_rediscover=True to force rediscovery with collection object as the scope.
 print(f"Virtual server depends on: {dependencies}")
 ```
 
@@ -412,7 +414,9 @@ The library includes intelligent iRule parsing that breaks down Tcl code to dete
 irule = collection['ltm rule /Common/my-irule']
 
 # The parser automatically detects references to pools, data groups, etc.
-dependencies = irule.get_dependencies(collection)
+dependencies = irule.get_dependencies()
+# or dependencies = irule.get_dependencies(collection) # Call with collection object if not initialised already.
+# or dependencies = irule.get_dependencies(collection, force_rediscover=True) # Call with collection object and force_rediscover=True to force rediscovery with collection object as the scope.
 print(f"iRule references: {dependencies}")
 
 # Find all data groups referenced in iRules

@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple, Union, Iterator, Dict, Literal
+from typing import List, Optional, Tuple, Union, Iterator, Dict, Literal, Set
 import re
 from f5_config_parser.caching import DependencyCache
 from f5_config_parser.stanza import ConfigStanza
@@ -25,8 +25,7 @@ class StanzaCollection:
     def from_config(cls,
                     config_text: str,
                     initialise_ip_rd: bool = True,
-                    initialise_dependencies: bool = True,
-                    initialise_irule_dependencies: bool = True) -> 'StanzaCollection':
+                    initialise_dependencies: bool = True) -> 'StanzaCollection':
         """Create collection from config text with full initialisation options"""
         if not config_text.strip():
             raise ValueError("Empty config string provided")
@@ -38,13 +37,10 @@ class StanzaCollection:
         validate_config(config_text, collection)
 
         if initialise_ip_rd:
-            collection._initialise_ip_to_rd()
+            collection.initialise_ip_to_rd()
 
         if initialise_dependencies:
-            collection._initialise_dependencies()
-
-        if initialise_irule_dependencies:
-            collection._initialise_irule_dependencies()
+            collection.initialise_dependencies()
 
         return collection
 
@@ -52,23 +48,19 @@ class StanzaCollection:
     def from_stanzas(cls,
                      stanzas: List[ConfigStanza],
                      initialise_ip_rd: bool = False,
-                     initialise_dependencies: bool = False,
-                     initialise_irule_dependencies: bool = False) -> 'StanzaCollection':
+                     initialise_dependencies: bool = False) -> 'StanzaCollection':
         """Create collection from existing stanzas with optional initialisation"""
         collection = cls(stanzas)
 
         if initialise_ip_rd:
-            collection._initialise_ip_to_rd()
+            collection.initialise_ip_to_rd()
 
         if initialise_dependencies:
-            collection._initialise_dependencies()
-
-        if initialise_irule_dependencies:
-            collection._initialise_irule_dependencies()
+            collection.initialise_dependencies()
 
         return collection
 
-    def _initialise_ip_to_rd(self) -> None:
+    def initialise_ip_to_rd(self) -> None:
         """Initialise IP and route domain attributes for applicable stanzas.
 
         Processes stanzas that have IP configuration to extract and set their
@@ -79,71 +71,47 @@ class StanzaCollection:
             if hasattr(stanza, '_parse_ips_to_ip_rd'):
                 stanza._parse_ips_to_ip_rd(self)
 
-    def _initialise_dependencies(self) -> None:
+    def initialise_dependencies(self, ignore_cache: bool = False, save_cache: bool = True) -> None:
         """Discover and set dependencies for all non-iRule and non-data-group stanzas in the collection.
 
         Uses collection context to resolve object references and populate
-        the _dependencies attribute for each stanza, excluding iRule and data-group stanzas.
-        """
-        # Try to load from cache first
-        cached_dependencies = None
-        if self._cache:
-            cached_dependencies = self._cache.load('standard')
+        the _dependencies attribute for each stanza.
 
-        if cached_dependencies is not None:
+        Args:
+            ignore_cache: If True, bypass cache loading and recalculate all dependencies
+            save_cache: If True, save calculated dependencies to cache
+        """
+        # Get paths for stanzas we need to process
+        standard_paths = {stanza.full_path for stanza in self.stanzas}
+
+        # Check cache coverage unless ignoring cache
+        use_cache = False
+        cached_dependencies = None
+
+        if not ignore_cache and self._cache and standard_paths:
+            if self._cache.check_coverage(standard_paths, 'dependencies'):
+                cached_dependencies = self._cache.load('dependencies')
+                if cached_dependencies is not None:
+                    use_cache = True
+
+        if use_cache:
             # Apply cached dependencies to stanzas
             for stanza in self.stanzas:
-                if stanza.prefix[:2] == ('ltm', 'rule') or stanza.prefix[:2] == ('ltm', 'data-group'):
-                    continue
                 if stanza.full_path in cached_dependencies:
                     stanza._dependencies = cached_dependencies[stanza.full_path]
             return
 
-        # Cache miss - calculate dependencies normally
+        # Cache miss, incomplete coverage, or ignoring cache - calculate dependencies
         dependencies_data = {}
 
         for stanza in self.stanzas:
-            # Skip iRule and data-group stanzas - they have their own initialisation method
-            if stanza.prefix[:2] == ('ltm', 'rule') or stanza.prefix[:2] == ('ltm', 'data-group'):
-                continue
-            # Discover dependencies for all other stanzas
-            dependencies = stanza.get_dependencies(self)
+            # Discover dependencies for all stanzas
+            dependencies = stanza.get_dependencies(self, force_rediscover=True)
             dependencies_data[stanza.full_path] = dependencies
 
-        # Save dependencies to cache
-        if self._cache:
-            self._cache.save(dependencies_data, 'standard')
-
-    def _initialise_irule_dependencies(self) -> None:
-        """Discover and set dependencies for iRule and data-group stanzas in the collection.
-
-        Uses collection context to resolve object references and populate
-        the _dependencies attribute for iRule and data-group stanzas only.
-        """
-        # Try to load from cache first
-        cached_dependencies = None
-        if self._cache:
-            cached_dependencies = self._cache.load('irule')
-
-        if cached_dependencies is not None:
-            # Apply cached dependencies to stanzas
-            for stanza in self.stanzas:
-                if stanza.full_path in cached_dependencies:
-                    stanza._dependencies = cached_dependencies[stanza.full_path]
-            return
-
-        # Cache miss - calculate dependencies normally
-        dependencies_data = {}
-
-        for stanza in self.stanzas:
-            # Only process iRule and data-group stanzas
-            if stanza.prefix[:2] == ('ltm', 'rule') or stanza.prefix[:2] == ('ltm', 'data-group'):
-                dependencies = stanza.get_dependencies(self)
-                dependencies_data[stanza.full_path] = dependencies
-
-        # Save dependencies to cache
-        if self._cache:
-            self._cache.save(dependencies_data, 'irule')
+        # Save dependencies to cache if requested
+        if save_cache and self._cache:
+            self._cache.save(dependencies_data, 'dependencies')
 
     def __len__(self) -> int:
         return len(self.stanzas)
