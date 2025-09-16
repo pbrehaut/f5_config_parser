@@ -72,7 +72,7 @@ class StanzaCollection:
                 stanza._parse_ips_to_ip_rd(self)
 
     def initialise_dependencies(self, ignore_cache: bool = False, save_cache: bool = True) -> None:
-        """Discover and set dependencies for all non-iRule and non-data-group stanzas in the collection.
+        """Discover and set dependencies for all stanzas in the collection.
 
         Uses collection context to resolve object references and populate
         the _dependencies attribute for each stanza.
