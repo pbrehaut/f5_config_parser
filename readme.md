@@ -280,6 +280,12 @@ certificates = load_certificates_from_tar('f5_backup.tar', load_pem_data=True)
 # Add certificates to collection
 collection += certificates
 
+# This method call is required in this instance to refresh stale dependencies that would have been initialised on config load above
+# The dependency state for the SSL profile objects would be initialised but missing the certificate objects, running this method will force a refresh
+# with the new scope available
+# It is also recommended to save the dependency cache at this point for performance boost. See performance section below
+collection.initialise_dependencies()
+
 # Analyse complete SSL dependency chain
 vs = collection['ltm virtual /Common/secure-web-server']
 all_dependencies = collection.get_related_stanzas([vs], 'dependencies')
@@ -1282,20 +1288,21 @@ This is particularly useful for:
 When working with large F5 configurations, consider these performance optimisations:
 
 ### Dependency Caching (Recommended Default)
-The default configuration enables automatic dependency discovery and caching for optimal performance:
+The default configuration enables automatic dependency discovery with manual cache saving for optimal performance:
 ```python
-# Recommended: Use defaults for automatic caching
+# Recommended: Use defaults for automatic discovery with manual cache saving
 collection = StanzaCollection.from_config(
     config_text,
-    initialise_ip_rd=True,           # Default: True - IP/RD resolution
-    initialise_dependencies=True,    # Default: True - Dependency discovery for all stanzas
+    initialise=True,           # Default: True - IP/RD resolution and Dependency discovery for all stanzas, Consider setting this to false if you know you are going to add in additional objects and reinitialise and save later.
 )
+# Save cache after initial dependency discovery
+collection.save_dependency_cache()
 ```
-**Why keep the defaults?**
-- First run discovers dependencies and saves them to a cache file
+**Benefits of manual cache saving:**
+- First run discovers dependencies, you save them to cache file when ready
 - Subsequent runs on the same config load dependencies from cache (much faster)
-- Cache automatically detects when new objects are added and refreshes accordingly
-- No performance penalty after initial discovery
+- Control when cache is saved after adding new objects (like certificates)
+- No performance penalty after initial discovery and cache save
 
 ### Flexible Dependency Access
 The dependency API automatically handles both cached and uncached states:
@@ -1312,12 +1319,12 @@ deps = stanza.get_dependencies(collection, force_rediscover=True)
 ```
 
 ### Lazy Initialisation (Special Cases)
-Only disable dependency initialisation for specific performance-critical scenarios:
+Only disable dependency initialisation for specific performance-critical scenarios, or when you will be adding additional objects immediately and reinitialising and saving the cache after that. Will:
 ```python
 # Skip dependency initialisation for faster loading (not recommended for most cases)
 collection = StanzaCollection.from_config(
     config_text, 
-    initialise_dependencies=False,
+    initialise=False,
 )
 
 # Manual dependency resolution when needed
@@ -1343,7 +1350,7 @@ for vs in important_vs:
 ### Adding Objects After Initial Load
 When you add stanzas to an existing collection, you can reinitialise dependencies to include the new objects:
 ```python
-# Load initial configuration with caching
+# Load initial configuration
 with open(INPUT_FILE) as f:
     all_stanzas = StanzaCollection.from_config(f.read())
 
@@ -1352,22 +1359,25 @@ certificates = load_certificates_from_tar(TAR_FILE)
 all_stanzas += certificates
 
 # Reinitialise dependencies to include certificate objects
-all_stanzas.initialise_dependencies()  # Detects new objects, recalculates all dependencies, saves to cache
+all_stanzas.initialise_dependencies()  # Detects new objects, recalculates all dependencies
+
+# Save updated cache with certificate dependencies
+all_stanzas.save_dependency_cache()
 ```
 
 **What happens during reinitialisation:**
 - Cache coverage check detects the new certificate objects aren't cached
 - All dependencies are recalculated (existing + new objects)
-- Updated dependency data is saved to cache automatically
+- Call save_dependency_cache() to save updated dependency data to cache
 - Next program run will load all dependencies (including certificates) from cache
 - SSL profiles, virtual servers, and other objects will now show certificate dependencies
 
 ### Cache File Benefits
-- **First Run**: Dependencies discovered and saved to cache file
+- **First Run**: Dependencies discovered, you save to cache file with save_dependency_cache()
 - **Subsequent Runs**: Dependencies loaded from cache (5-10x faster)
-- **Automatic Coverage Detection**: Cache refreshes when new objects are added
+- **Manual Coverage Control**: You control when cache is saved after adding new objects
 - **Unified Processing**: All dependency types (including iRules) cached together
-- **Invalidation**: Cache automatically refreshes when config changes
+- **Controlled Updates**: Cache updates when you call save_dependency_cache() after changes
  
 ## Error Handling and Logging
 
