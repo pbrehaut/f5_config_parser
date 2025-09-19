@@ -32,14 +32,14 @@ class TestIRuleParserFunctions:
         result = parse_irule([])
         assert result == {
             'irule_flow': [],
-            'unique_words': set(),
+            'unique_words': [],
             'http_responses': []
         }
 
         result = parse_irule(["", "   ", "\t"])
         assert result == {
             'irule_flow': [],
-            'unique_words': set(),
+            'unique_words': [],
             'http_responses': []
         }
 
@@ -53,7 +53,7 @@ class TestIRuleParserFunctions:
         result = parse_irule(lines)
         assert result == {
             'irule_flow': [],
-            'unique_words': set(),
+            'unique_words': [],
             'http_responses': []
         }
 

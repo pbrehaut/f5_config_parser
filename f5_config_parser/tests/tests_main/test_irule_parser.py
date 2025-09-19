@@ -56,7 +56,7 @@ class TestExtractUniqueWords:
     def test_empty_input(self):
         """Test with empty list"""
         result = extract_unique_words([])
-        assert result == set()
+        assert result == []
 
     def test_empty_lines_and_whitespace(self):
         """Test handling of empty lines and whitespace"""
@@ -522,7 +522,7 @@ class TestParseIrule:
 
         assert result['irule_flow'] == []
         assert result['http_responses'] == []
-        assert result['unique_words'] == set()
+        assert result['unique_words'] == []
 
     def test_comments_only_irule(self):
         """Test parsing an iRule with only comments"""
@@ -537,7 +537,7 @@ class TestParseIrule:
 
         assert result['irule_flow'] == []
         assert result['http_responses'] == []
-        assert result['unique_words'] == set()
+        assert result['unique_words'] == []
 
 
 # Sample data fixtures for testing

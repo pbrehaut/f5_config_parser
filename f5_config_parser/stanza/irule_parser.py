@@ -54,7 +54,7 @@ def extract_unique_words(irule_lines):
                     and cleaned_word):  # Make sure it's not empty after stripping
                 unique_words.add(cleaned_word)
 
-    return unique_words
+    return list(unique_words)
 
 
 def extract_irule_flow(irule_lines):
