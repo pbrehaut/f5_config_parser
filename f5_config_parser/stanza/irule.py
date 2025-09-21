@@ -18,7 +18,7 @@ class IRuleStanza(ConfigStanza):
         dependency_paths = []
 
         # Search unique words in priority order of likelihood
-        unique_words = self.parsed_config.get('unique_words', set())
+        unique_words = self.parsed_config.get('unique_words', [])
 
         # Define search scopes in priority order
         search_scopes = [

@@ -28,8 +28,10 @@ class ConfigStanza:
         self.config_lines = config_lines
 
     def __hash__(self) -> int:
-        """Hash based on full path for set operations"""
-        return hash(self.full_path)
+        """Hash based on full path and normalised content"""
+        # Use the same normalisation logic that has_same_content() uses
+        normalised_content = '\n'.join([self.normalise_line(line) for line in self.config_lines if self.normalise_line(line)])
+        return hash((self.full_path, normalised_content))
 
     def __eq__(self, other) -> bool:
         """
@@ -83,32 +85,33 @@ class ConfigStanza:
         if not normalise_whitespace:
             return self.config_lines == other.config_lines
 
-        def normalise_line(line):
-            """Conservative normalisation: strip edges and normalise internal whitespace"""
-            # Strip leading/trailing whitespace
-            stripped = line.strip()
-            if not stripped:
-                return ''
-
-            # Replace multiple whitespace with single space, but preserve quoted strings
-            # This regex preserves quoted strings while normalising other whitespace
-            parts = re.split(r'("[^"]*")', stripped)
-            normalised_parts = []
-
-            for i, part in enumerate(parts):
-                if i % 2 == 0:  # Not inside quotes
-                    # Normalise whitespace outside quotes
-                    normalised_parts.append(re.sub(r'\s+', ' ', part))
-                else:  # Inside quotes
-                    # Preserve quoted content exactly
-                    normalised_parts.append(part)
-
-            return ''.join(normalised_parts)
-
-        self_normalised = [normalise_line(line) for line in self.config_lines if normalise_line(line)]
-        other_normalised = [normalise_line(line) for line in other.config_lines if normalise_line(line)]
+        self_normalised = [self.normalise_line(line) for line in self.config_lines if self.normalise_line(line)]
+        other_normalised = [self.normalise_line(line) for line in other.config_lines if self.normalise_line(line)]
 
         return self_normalised == other_normalised
+
+    @staticmethod
+    def normalise_line(line):
+        """Conservative normalisation: strip edges and normalise internal whitespace"""
+        # Strip leading/trailing whitespace
+        stripped = line.strip()
+        if not stripped:
+            return ''
+
+        # Replace multiple whitespace with single space, but preserve quoted strings
+        # This regex preserves quoted strings while normalising other whitespace
+        parts = re.split(r'("[^"]*")', stripped)
+        normalised_parts = []
+
+        for i, part in enumerate(parts):
+            if i % 2 == 0:  # Not inside quotes
+                # Normalise whitespace outside quotes
+                normalised_parts.append(re.sub(r'\s+', ' ', part))
+            else:  # Inside quotes
+                # Preserve quoted content exactly
+                normalised_parts.append(part)
+
+        return ''.join(normalised_parts)
 
     def _discover_dependencies(self, collection: 'StanzaCollection') -> List[str]:
         """Override in subclasses to implement specific dependency discovery"""

@@ -77,13 +77,6 @@ class TestStringComparison:
         # Same name, different content
         assert s['stanza1'] != s['stanza1_different']
 
-    def test_stanza_hash_consistency_with_strings(self, sample_stanzas):
-        """Test that stanza and its full_path string have same hash"""
-        stanza = sample_stanzas['stanza1']
-        full_path = "ltm pool app-pool"
-
-        assert hash(stanza) == hash(full_path)
-
 
 class TestBasicSetOperations:
     """Test basic set operations between stanzas and strings"""
@@ -96,22 +89,22 @@ class TestBasicSetOperations:
         target_names = {"ltm pool app-pool", "ltm virtual app-vs"}
 
         # Object set
-        stanza_set = {s['stanza1'], s['stanza2'], s['stanza3']}
+        stanza_set = {x.full_path for x in [s['stanza1'], s['stanza2'], s['stanza3']]}
 
         # Intersection should return stanzas that match the names
         intersection = stanza_set & target_names
 
         assert len(intersection) == 2
-        assert s['stanza1'] in intersection
-        assert s['stanza2'] in intersection
-        assert s['stanza3'] not in intersection
+        assert s['stanza1'].full_path in intersection
+        assert s['stanza2'].full_path in intersection
+        assert s['stanza3'].full_path not in intersection
 
     def test_stanza_set_intersection_with_string_set(self, sample_stanzas):
         """Test intersection from the other direction"""
         s = sample_stanzas
 
         target_names = {"ltm pool app-pool", "ltm node 192.168.1.10"}
-        stanza_set = {s['stanza1'], s['stanza2'], s['stanza3']}
+        stanza_set = {x.full_path for x in [s['stanza1'], s['stanza2'], s['stanza3']]}
 
         # Should work both ways
         intersection1 = stanza_set & target_names
@@ -119,21 +112,21 @@ class TestBasicSetOperations:
 
         assert intersection1 == intersection2
         assert len(intersection1) == 2
-        assert s['stanza1'] in intersection1
-        assert s['stanza3'] in intersection1
+        assert s['stanza1'].full_path in intersection1
+        assert s['stanza3'].full_path in intersection1
 
     def test_set_difference_operations(self, sample_stanzas):
         """Test set difference operations"""
         s = sample_stanzas
 
-        stanza_set = {s['stanza1'], s['stanza2'], s['stanza3']}
+        stanza_set = {x.full_path for x in [s['stanza1'], s['stanza2'], s['stanza3']]}
         target_names = {"ltm pool app-pool", "ltm virtual non-existent"}
 
         # Stanzas not in target names
         not_in_target = stanza_set - target_names
         assert len(not_in_target) == 2  # stanza2 and stanza3
-        assert s['stanza2'] in not_in_target
-        assert s['stanza3'] in not_in_target
+        assert s['stanza2'].full_path in not_in_target
+        assert s['stanza3'].full_path in not_in_target
 
         # Target names not in stanzas (this returns strings)
         names_not_in_stanzas = target_names - stanza_set
@@ -223,7 +216,7 @@ class TestAdvancedSetOperations:
 
         # Convert to sets for intersection
         stanza_set = set(collection1)
-        filtered_stanzas = stanza_set & target_names
+        filtered_stanzas = {x.full_path for x in stanza_set} & target_names
         filtered_collection = StanzaCollection([collection1[x] for x in filtered_stanzas])
 
         assert len(filtered_collection) == 2
@@ -247,11 +240,11 @@ class TestAdvancedSetOperations:
         assert common_to_all == {"ltm pool app-pool"}
 
         # Find objects in set1 that match names of interest
-        set1_matching = set1 & names_of_interest
+        set1_matching = {x.full_path for x in set1} & names_of_interest
         assert len(set1_matching) == 2
 
         # Find objects in set2 that match names of interest
-        set2_matching = set2 & names_of_interest
+        set2_matching = {x.full_path for x in set2} & names_of_interest
         assert len(set2_matching) == 2
 
     def test_content_vs_name_based_operations(self, sample_stanzas):
@@ -308,11 +301,11 @@ class TestEdgeCases:
 
         # Mix of strings and objects
         mixed_set = {"ltm pool app-pool", s['stanza2'], "ltm node other"}
-        stanza_set = {s['stanza1'], s['stanza3']}
+        stanza_set = {x.full_path for x in [s['stanza1'], s['stanza3']]}
 
         # Should still work
         intersection = mixed_set & stanza_set
-        assert s['stanza1'] in intersection  # Matches the string "ltm pool app-pool"
+        assert s['stanza1'].full_path in intersection  # Matches the string "ltm pool app-pool"
 
     def test_hash_collision_handling(self, sample_stanzas):
         """Test that objects with same hash but different equality work correctly"""
@@ -327,7 +320,7 @@ class TestEdgeCases:
         # When intersecting with string, both objects match the string "ltm pool app-pool"
         # but the intersection will only contain one of them (whichever set operations finds first)
         string_set = {"ltm pool app-pool"}
-        intersection = same_name_set & string_set
+        intersection = {x.full_path for x in same_name_set} & string_set
         assert len(intersection) == 1  # Only one object will be in the intersection
 
         # Verify that the object in the intersection does match the string

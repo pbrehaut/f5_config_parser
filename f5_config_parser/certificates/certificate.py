@@ -161,14 +161,23 @@ class Certificate(ConfigStanza):
         return f"{self.full_path} {{\n    # Certificate: {self.filename}\n    # Subject: {self.subject}\n}}\n"
 
     def __hash__(self) -> int:
-        """Hash based on full path for uniqueness in collections"""
-        return hash(self.full_path)
+        """Hash based on full path and cert id for uniqueness in collections"""
+        return hash((self.full_path, self.cert_id))
 
     def __eq__(self, other) -> bool:
-        """Certificates are equal if they represent the same actual certificate"""
-        if not isinstance(other, Certificate):
+        """
+        Compare certificates based on type:
+        - When compared to string: compare full_path only (for set operations and filtering)
+        - When compared to Certificate: compare full_path AND cert_id (for detailed analysis)
+        """
+        if isinstance(other, str):
+            # String comparison - just check full_path (enables set operations with name strings)
+            return self.full_path == other
+        elif isinstance(other, Certificate):
+            # Object comparison - check both full_path and cert_id
+            return self.full_path == other.full_path and self.cert_id == other.cert_id
+        else:
             return False
-        return self.cert_id == other.cert_id
 
     def verify_key_match(self) -> bool:
         """
