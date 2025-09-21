@@ -897,11 +897,11 @@ from f5_config_parser.collection import StanzaCollection
 # Load configurations from two different F5 devices
 with open('device1_config.txt') as f:
     device1_collection = StanzaCollection.from_config(f.read(),
-                                                      initialise_dependencies=False)
+                                                      initialise=False)
 
 with open('device2_config.txt') as f:
     device2_collection = StanzaCollection.from_config(f.read(),
-                                                      initialise_dependencies=False)
+                                                      initialise=False)
 
 # Extract sets of full_path strings to find objects with matching names
 device1_paths = {stanza.full_path for stanza in device1_collection}
@@ -916,10 +916,13 @@ device2_set = set(device2_collection)
 # Intersection of device1 and device2 to identify config items that have the same name and same configuration
 common_stanzas = device1_set & device2_set
 
+# Convert to strings to allow comparison with the common_stanzas set
+common_stanzas_paths = {stanza.full_path for stanza in common_stanzas}
+
 # Find objects that exist on both devices under the same name but have differing config
-differing_stanzas = common_paths - common_stanzas
-differing_stanzas_collection_1 = StanzaCollection.from_stanzas([device1_collection[x] for x in differing_stanzas])
-differing_stanzas_collection_2 = StanzaCollection.from_stanzas([device2_collection[x] for x in differing_stanzas])
+differing_stanzas = common_paths - common_stanzas_paths
+differing_stanzas_collection_1 = StanzaCollection([device1_collection[x] for x in differing_stanzas])
+differing_stanzas_collection_2 = StanzaCollection([device2_collection[x] for x in differing_stanzas])
 
 # Quick and dirty comparison
 for path in differing_stanzas:
