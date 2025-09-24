@@ -24,28 +24,30 @@ class ConfigStanza:
         self._parsed_config: Optional[Dict[str, Any]] = None
         self._dependencies: Optional[List[str]] = None
         self._dependents: Optional[List[str]] = None
+
+        # Compute and store frozen content hash for stable equality/hashing
+        normalised_content = '\n'.join(
+            [self.normalise_line(line) for line in config_lines if self.normalise_line(line)])
+        self._frozen_content_hash = hash(normalised_content)
+
         # Use the property setter to initialise
         self.config_lines = config_lines
 
     def __hash__(self) -> int:
-        """Hash based on full path and normalised content"""
-        # Use the same normalisation logic that has_same_content() uses
-        normalised_content = '\n'.join([self.normalise_line(line) for line in self.config_lines if self.normalise_line(line)])
-        return hash((self.full_path, normalised_content))
+        """Hash based on full path and frozen content from initialisation"""
+        return hash((self.full_path, self._frozen_content_hash))
 
     def __eq__(self, other) -> bool:
         """
         Compare stanzas based on type:
         - When compared to string: compare full_path only (for set operations and filtering)
-        - When compared to ConfigStanza: compare full_path AND content (for detailed analysis)
+        - When compared to ConfigStanza: compare full_path AND initial content (frozen at creation)
         """
         if isinstance(other, str):
-            # String comparison - just check full_path (enables set operations with name strings)
             return self.full_path == other
         elif isinstance(other, ConfigStanza):
-            # Object comparison - check both full_path and content
             return (self.full_path == other.full_path and
-                    self.has_same_content(other))
+                    self._frozen_content_hash == other._frozen_content_hash)
         else:
             return False
 

@@ -238,7 +238,7 @@ class TestConfigurationDifferentials:
         assert hash1 == hash2
 
         # Hash should be based on full_path
-        expected_hash = hash((stanza.full_path, '\n'.join([stanza.normalise_line(line) for line in stanza.config_lines if stanza.normalise_line(line)])))
+        expected_hash = hash((stanza.full_path, stanza._frozen_content_hash))
         assert hash(stanza) == expected_hash
 
     def test_config_drift_detection(self, original_config, modified_config):
