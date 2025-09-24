@@ -442,6 +442,80 @@ ltm virtual vs-web-ssl {
         for stanza in additional_vs:
             assert stanza in combined
 
+    def test_init_prevents_duplicate_full_paths(self, all_stanzas):
+        """Test that initialising with duplicate full_path stanzas raises DuplicateStanzaError"""
+        # Get a stanza to duplicate
+        original_stanza = all_stanzas['ltm virtual vs-web-basic']
+
+        # Create a duplicate stanza with the same full_path
+        duplicate_stanza = ConfigStanza(
+            prefix=original_stanza.prefix,
+            name=original_stanza.name,
+            config_lines=original_stanza.config_lines.copy()
+        )
+
+        # Attempt to create collection with duplicates
+        duplicate_stanzas = [original_stanza, duplicate_stanza]
+
+        with pytest.raises(DuplicateStanzaError) as exc_info:
+            StanzaCollection(duplicate_stanzas)
+
+        # Check the error message contains expected information
+        assert "duplicate full_path(s) found" in str(exc_info.value)
+        assert original_stanza.full_path in str(exc_info.value)
+
+    def test_init_allows_unique_full_paths(self, all_stanzas):
+        """Test that initialising with unique full_path stanzas works correctly"""
+        # Get a few different stanzas
+        vs_basic = all_stanzas['ltm virtual vs-web-basic']
+        vs_ssl = all_stanzas['ltm virtual vs-web-ssl']
+        http_monitor = all_stanzas['ltm monitor http mon-http-basic']
+
+        unique_stanzas = [vs_basic, vs_ssl, http_monitor]
+
+        # Should not raise any errors
+        collection = StanzaCollection(unique_stanzas)
+
+        assert len(collection) == 3
+        assert vs_basic in collection
+        assert vs_ssl in collection
+        assert http_monitor in collection
+
+    def test_init_with_empty_list(self):
+        """Test that initialising with empty list works correctly"""
+        collection = StanzaCollection([])
+        assert len(collection) == 0
+
+    def test_init_multiple_duplicates(self, all_stanzas):
+        """Test error message with multiple different duplicates"""
+        # Get stanzas to duplicate
+        vs_basic = all_stanzas['ltm virtual vs-web-basic']
+        http_monitor = all_stanzas['ltm monitor http mon-http-basic']
+
+        # Create duplicates
+        duplicate_vs = ConfigStanza(
+            prefix=vs_basic.prefix,
+            name=vs_basic.name,
+            config_lines=vs_basic.config_lines.copy()
+        )
+
+        duplicate_monitor = ConfigStanza(
+            prefix=http_monitor.prefix,
+            name=http_monitor.name,
+            config_lines=http_monitor.config_lines.copy()
+        )
+
+        # List with multiple duplicates
+        stanzas_with_duplicates = [vs_basic, duplicate_vs, http_monitor, duplicate_monitor]
+
+        with pytest.raises(DuplicateStanzaError) as exc_info:
+            StanzaCollection(stanzas_with_duplicates)
+
+        error_msg = str(exc_info.value)
+        assert "duplicate full_path(s) found" in error_msg
+        assert vs_basic.full_path in error_msg
+        assert http_monitor.full_path in error_msg
+
 
 # Test sample usage patterns
 class TestStanzaCollectionUsagePatterns:

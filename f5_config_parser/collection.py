@@ -1,5 +1,6 @@
 from typing import List, Optional, Tuple, Union, Iterator, Dict, Literal, Set
 import re
+from collections import Counter
 from f5_config_parser.caching import DependencyCache
 from f5_config_parser.stanza import ConfigStanza
 from f5_config_parser.factory import StanzaFactory
@@ -17,6 +18,14 @@ class StanzaCollection:
 
     def __init__(self, stanzas: List[ConfigStanza], config_str: Optional[str] = None):
         """Basic constructor - stores stanzas and optional config string"""
+        # Check for duplicate full_path attributes in the initial stanzas
+        full_paths = [stanza.full_path for stanza in stanzas]
+        duplicates = [path for path, count in Counter(full_paths).items() if count > 1]
+
+        if duplicates:
+            raise DuplicateStanzaError(
+                f"Cannot initialise StanzaCollection - duplicate full_path(s) found: {sorted(duplicates)}")
+
         self.stanzas = stanzas
         self.config_str = config_str
         self._cache = DependencyCache(config_str) if config_str else None
@@ -151,27 +160,21 @@ class StanzaCollection:
         other_stanzas = self._normalise_items(other)
 
         # Check for duplicates within the argument being added
-        other_set = set(other_stanzas)
-        if len(other_set) != len(other_stanzas):
-            # Find the duplicates within the argument
-            seen = set()
-            internal_duplicates = []
-            for stanza in other_stanzas:
-                if stanza.full_path in seen:
-                    internal_duplicates.append(stanza.full_path)
-                seen.add(stanza.full_path)
+        other_paths = [stanza.full_path for stanza in other_stanzas]
+        internal_duplicates = [path for path, count in Counter(other_paths).items() if count > 1]
 
+        if internal_duplicates:
             raise DuplicateStanzaError(
                 f"Cannot add stanzas - duplicates found within the argument: {sorted(internal_duplicates)}.")
 
-        # Use set operations to detect duplicates between collections
-        existing_set = set(self.stanzas)
-        duplicates_between = existing_set & other_set
+        # Check for duplicates between collections
+        existing_paths = {stanza.full_path for stanza in self.stanzas}
+        other_paths_set = set(other_paths)
+        duplicates_between = existing_paths & other_paths_set
 
         if duplicates_between:
-            duplicate_paths = {stanza.full_path for stanza in duplicates_between}
             raise DuplicateStanzaError(
-                f"Cannot add stanzas with duplicate full_path(s): {sorted(duplicate_paths)}. "
+                f"Cannot add stanzas with duplicate full_path(s): {sorted(duplicates_between)}. "
                 f"If you want to replace objects with the same name, overwrite the config_lines "
                 f"list attribute in the existing object instead."
             )
@@ -190,27 +193,21 @@ class StanzaCollection:
         other_stanzas = self._normalise_items(other)
 
         # Check for duplicates within the argument being added
-        other_set = set(other_stanzas)
-        if len(other_set) != len(other_stanzas):
-            # Find the duplicates within the argument
-            seen = set()
-            internal_duplicates = []
-            for stanza in other_stanzas:
-                if stanza.full_path in seen:
-                    internal_duplicates.append(stanza.full_path)
-                seen.add(stanza.full_path)
+        other_paths = [stanza.full_path for stanza in other_stanzas]
+        internal_duplicates = [path for path, count in Counter(other_paths).items() if count > 1]
 
+        if internal_duplicates:
             raise DuplicateStanzaError(
                 f"Cannot add stanzas - duplicates found within the argument: {sorted(internal_duplicates)}.")
 
-        # Use set operations to detect duplicates between collections
-        existing_set = set(self.stanzas)
-        duplicates_between = existing_set & other_set
+        # Check for duplicates between collections
+        existing_paths = {stanza.full_path for stanza in self.stanzas}
+        other_paths_set = set(other_paths)
+        duplicates_between = existing_paths & other_paths_set
 
         if duplicates_between:
-            duplicate_paths = {stanza.full_path for stanza in duplicates_between}
             raise DuplicateStanzaError(
-                f"Cannot add stanzas with duplicate full_path(s): {sorted(duplicate_paths)}. "
+                f"Cannot add stanzas with duplicate full_path(s): {sorted(duplicates_between)}. "
                 f"If you want to replace objects with the same name, overwrite the config_lines "
                 f"list attribute in the existing object instead."
             )
@@ -354,7 +351,8 @@ class StanzaCollection:
         return None
 
     def get_related_stanzas(self, initial_stanzas: List[ConfigStanza],
-                            relation_type: Literal['dependencies', 'dependents'] = 'dependencies') -> 'StanzaCollection':
+                            relation_type: Literal[
+                                'dependencies', 'dependents'] = 'dependencies') -> 'StanzaCollection':
         """
         Recursively discover all stanzas related to the initial set through dependencies or dependents.
 
