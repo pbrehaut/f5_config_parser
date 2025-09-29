@@ -9,6 +9,12 @@ if TYPE_CHECKING:
 class VirtualServerStanza(ConfigStanza):
     """Virtual server with collection-based dependency resolution"""
 
+    # Define profile scopes to search in order of preference
+    PROFILE_SCOPES = [
+        ("ltm", "profile"),
+        ("security", "bot-defense", "asm-profile"),
+    ]
+
     def _do_parse(self) -> Dict[str, Any]:
         """Do additional processing for IPs after initial parsing"""
         parsed_from_base = self._parse_lines(self.config_lines, 0)[0]
@@ -30,6 +36,14 @@ class VirtualServerStanza(ConfigStanza):
             rd = self.get_default_rd(collection=collection)
 
         self.parsed_config['ip_rd'] = (self.parsed_config.get('ip_address'), rd)
+
+    def _find_profile_in_scopes(self, profile_name: str, collection: 'StanzaCollection') -> str:
+        """Search for a profile across multiple scopes, returning the first match found"""
+        for scope in self.PROFILE_SCOPES:
+            profile_path = collection.resolve_object_by_name(profile_name, scope)
+            if profile_path:
+                return profile_path
+        return None
 
     def _discover_dependencies(self, collection: 'StanzaCollection') -> List[str]:
         """Discover dependencies using collection filtering"""
@@ -64,11 +78,11 @@ class VirtualServerStanza(ConfigStanza):
             if pool_path:
                 dependency_paths.append(pool_path)
 
-        # Profile dependencies (search within ltm profile scope)
+        # Profile dependencies (search across multiple scopes)
         profiles = self.get_config_value('profiles')
         if isinstance(profiles, dict):
             for profile_name in profiles.keys():
-                profile_path = collection.resolve_object_by_name(profile_name, ("ltm", "profile"))
+                profile_path = self._find_profile_in_scopes(profile_name, collection)
                 if profile_path:
                     dependency_paths.append(profile_path)
 
