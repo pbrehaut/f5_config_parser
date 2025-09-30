@@ -13,6 +13,7 @@ class VirtualServerStanza(ConfigStanza):
     PROFILE_SCOPES = [
         ("ltm", "profile"),
         ("security", "bot-defense", "asm-profile"),
+        ("apm", "policy", "access-policy"),
     ]
 
     def _do_parse(self) -> Dict[str, Any]:
