@@ -371,18 +371,6 @@ class TestCertificate:
         assert cert != "not a certificate"
         assert cert != 42
 
-    def test_do_parse_raises_not_implemented(self, temp_cert_dir, basic_cert_data):
-        """Test that _do_parse raises NotImplementedError"""
-        cert_file = temp_cert_dir / "parse-test.crt"
-        cert_file.write_bytes(basic_cert_data['cert_pem'])
-
-        clean_to_filesystem = {"parse-test.crt": "parse-test.crt"}
-
-        cert = Certificate("parse-test.crt", "parse-test.crt", temp_cert_dir, clean_to_filesystem)
-
-        with pytest.raises(NotImplementedError, match="Certificate parsing is handled in __init__"):
-            cert._do_parse()
-
     @patch('f5_config_parser.certificates.certificate.Certificate._discover_dependencies')
     def test_discover_dependencies_called(self, mock_discover, temp_cert_dir, basic_cert_data):
         """Test that dependency discovery can be called"""

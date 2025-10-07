@@ -141,12 +141,6 @@ class Certificate(ConfigStanza):
 
         return dependency_paths
 
-    def _do_parse(self) -> dict:
-        """
-        Certificate parsing is done in __init__, no additional parsing needed
-        """
-        raise NotImplementedError("Certificate parsing is handled in __init__")
-
     def __repr__(self):
         cn = [x.replace('CN=', '') for x in self.subject.split(',') if 'CN=' in x]
         cn_str = cn[0] if cn else 'Unknown'
@@ -178,6 +172,27 @@ class Certificate(ConfigStanza):
             return self.full_path == other.full_path and self.cert_id == other.cert_id
         else:
             return False
+
+    def _do_parse(self) -> dict:
+        """
+        Build parsed config dictionary from certificate attributes.
+        Certificate parsing happens in __init__, this just packages it.
+        """
+        return {
+            'filename': self.filename,
+            'filesystem_filename': self.filesystem_filename,
+            'subject': self.subject,
+            'issuer': self.issuer,
+            'serial_number': self.serial_number,
+            'not_valid_before': self.not_valid_before,
+            'not_valid_after': self.not_valid_after,
+            'signature_algorithm': self.signature_algorithm,
+            'ski': self.ski,
+            'aki': self.aki,
+            'is_ca': self.is_ca,
+            'key_filename': self.key_filename,
+            'key_filesystem_filename': self.key_filesystem_filename,
+        }
 
     def verify_key_match(self) -> bool:
         """

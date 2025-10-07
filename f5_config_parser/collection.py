@@ -307,8 +307,12 @@ class StanzaCollection:
         """Check if stanza matches all parsed config filters."""
         for key, expected_value in parsed_config_filters.items():
             actual_value = stanza.parsed_config.get(key)
-            if str(actual_value) != str(expected_value):
-                return False
+            if isinstance(expected_value, re.Pattern):
+                if actual_value is None or not expected_value.search(str(actual_value)):
+                    return False
+            else:
+                if str(actual_value) != str(expected_value):
+                    return False
         return True
 
     def resolve_object_by_name(self, object_name: str, scope_prefix: Tuple[str, ...]):
