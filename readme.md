@@ -77,7 +77,7 @@ cd f5-config-parser
 ### Basic Usage
 
 ```python
-from f5_config_parser.collection import StanzaCollection
+from f5_config_parser import StanzaCollection
 
 # Parse a configuration file
 with open('bigip.conf', 'r') as f:
@@ -140,7 +140,7 @@ The helper function replaces this manual workflow:
 ```python
 # Manual approach (more control, more code)
 from pathlib import Path
-from f5_config_parser.collection import StanzaCollection
+from f5_config_parser import StanzaCollection
 from f5_config_parser.certificates.certificate_loader import load_certificates_from_tar
 
 # Load configuration
@@ -189,7 +189,7 @@ The helper function provides the same functionality as manual initialisation but
 
 ```python
 from f5_config_parser.certificates.certificate_loader import load_certificates_from_tar
-from f5_config_parser.collection import StanzaCollection
+from f5_config_parser import StanzaCollection
 
 # Load certificates from F5 tar archive
 certificates = load_certificates_from_tar('f5_backup.tar', load_pem_data=True)
@@ -398,7 +398,7 @@ print(f"Unused certificates: {[cert.filename for cert in unused_certs]}")
 Collections support standard Python operators for adding and removing stanzas, with all operations being logged to the stanza's change history:
 
 ```python
-from f5_config_parser.collection import StanzaCollection
+from f5_config_parser import StanzaCollection
 
 # Load initial collections
 with open('config1.txt') as f:
@@ -636,7 +636,7 @@ ssl_vs = collection.filter(
 A common operational task is creating new configurations based on existing ones with specific modifications. The library provides powerful tools for configuration manipulation with automatic change logging:
 
 ```python
-from f5_config_parser.collection import StanzaCollection
+from f5_config_parser import StanzaCollection
 
 # Load existing configuration
 with open('input/bigip.conf') as f:
@@ -716,7 +716,7 @@ When decommissioning virtual servers, it's critical to identify and remove only 
 
 ```python
 from f5_config_parser.dependency_resolver import build_waves_structure
-from f5_config_parser.collection import StanzaCollection
+from f5_config_parser import StanzaCollection
 
 # Load the F5 configuration
 with open('f5_scf_config.txt') as f:
@@ -792,7 +792,7 @@ Over time, F5 configurations can accumulate orphaned objects - pools, profiles, 
 
 ```python
 from f5_config_parser.dependency_resolver import build_waves_structure
-from f5_config_parser.collection import StanzaCollection
+from f5_config_parser import StanzaCollection
 from f5_config_parser.certificates.certificate_loader import load_certificates_from_tar
 
 # Load F5 configuration
@@ -911,7 +911,7 @@ This approach is particularly valuable for:
 Virtual server configurations reference profiles by name without specifying the profile type, making it challenging to identify which virtual servers use specific types of profiles (HTTP, TCP, SSL, etc.). The library enables simple cross-referencing to discover these relationships:
 
 ```python
-from f5_config_parser.collection import StanzaCollection
+from f5_config_parser import StanzaCollection
 
 # Load configuration
 with open('f5_config.txt') as f:
@@ -977,7 +977,7 @@ This approach is particularly valuable for:
 Comparing configurations between F5 devices is straightforward using Python's built-in set operations. The library's design allows powerful analysis with minimal code by leveraging the object's `full_path` for identification and `config_lines` for comparison:
 
 ```python
-from f5_config_parser.collection import StanzaCollection
+from f5_config_parser import StanzaCollection
 
 # Load configurations from two different F5 devices
 with open('device1_config.txt') as f:
@@ -1055,7 +1055,7 @@ The beauty of this approach is its simplicity - no complex APIs or methods to le
 When working with complex F5 configurations that have nested structures and varying attribute presence, you may need more granular control than basic filtering methods provide. This verbose filtering approach is particularly useful when you need to drill down into nested configuration objects (like pool members), handle optional or missing attributes gracefully, or combine multiple filtering criteria across different levels of the configuration hierarchy. You have the flexibility to use either traditional loops with exception handling for robust error handling, or list comprehensions for cleaner code when you're confident about the data structure consistency.
 
 ```python
-from f5_config_parser.collection import StanzaCollection
+from f5_config_parser import StanzaCollection
 
 with open("f5_config.txt") as f:
     collection = StanzaCollection.from_config(f.read(), initialise_dependencies=False)
@@ -1133,7 +1133,7 @@ The choice between loops with exception handling, direct config_lines analysis, 
 When the built-in filter method's simple inclusion matching isn't sufficient for your needs, set operations provide a powerful way to create compound filtering logic on a single collection. This approach is essential when you need AND, OR, or NOT operations across different filtering criteria, since the filter method doesn't natively support these compound operations. You can extract multiple filtered sets based on different criteria and then use set operations to combine them in sophisticated ways.
 
 ```python
-from f5_config_parser.collection import StanzaCollection
+from f5_config_parser import StanzaCollection
 
 with open("f5_config.txt") as f:
     collection = StanzaCollection.from_config(f.read(), initialise_dependencies=False)
@@ -1240,7 +1240,7 @@ Set operations provide the compound filtering capabilities that the basic filter
 When you need to determine exactly which self IP network objects contain specific pool members, the get_related_stanzas method provides a starting point by finding related network objects, but it doesn't tell you which specific networks match individual pool members. To drill down and identify precise network containment relationships, you can use the built-in contains functionality by testing if a pool member's IP_ID is within each network object. This approach is essential for network troubleshooting, security analysis, and validating that pool members are accessible through the correct network interfaces.
 
 ```python
-from f5_config_parser.collection import StanzaCollection
+from f5_config_parser import StanzaCollection
 
 with open("f5_config.txt") as f:
     collection = StanzaCollection.from_config(f.read(), initialise_dependencies=False)
@@ -1342,7 +1342,7 @@ While get_related_stanzas identifies potential network relationships through dep
 The library makes it simple to output F5 configuration in its original format by calling `str()` on collections or individual stanzas:
 
 ```python
-from f5_config_parser.collection import StanzaCollection
+from f5_config_parser import StanzaCollection
 
 # Load configuration
 with open('f5_config.txt') as f:
