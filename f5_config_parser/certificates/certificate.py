@@ -77,6 +77,21 @@ class Certificate(ConfigStanza):
         except x509.ExtensionNotFound:
             pass
 
+        # Extract AIA and OCSP
+        self.aia = None
+        self.ocsp_uri = None
+        try:
+            aia_ext = cert.extensions.get_extension_for_oid(x509.ExtensionOID.AUTHORITY_INFORMATION_ACCESS)
+            self.aia = aia_ext.value
+
+            # Extract OCSP URI from AIA
+            for access_description in self.aia:
+                if access_description.access_method == x509.oid.AuthorityInformationAccessOID.OCSP:
+                    self.ocsp_uri = access_description.access_location.value
+                    break
+        except x509.ExtensionNotFound:
+            pass
+
         # Check if it's a CA certificate
         self.is_ca = False
         try:
@@ -189,6 +204,7 @@ class Certificate(ConfigStanza):
             'signature_algorithm': self.signature_algorithm,
             'ski': self.ski,
             'aki': self.aki,
+            'ocsp_uri': self.ocsp_uri,
             'is_ca': self.is_ca,
             'key_filename': self.key_filename,
             'key_filesystem_filename': self.key_filesystem_filename,
