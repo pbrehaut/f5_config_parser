@@ -8,6 +8,7 @@ A Python library for parsing, analysing, and manipulating F5 BIG-IP configuratio
   - [From source](#from-source)
 - [Quick Start](#quick-start)
   - [Basic Usage](#basic-usage)
+  - [Simplified Initialisation with Helper Function](#simplified-initialisation-with-helper-function)
   - [Working with Certificates](#working-with-certificates)
   - [Working with Collections](#working-with-collections)
 - [Core Components](#core-components)
@@ -99,6 +100,90 @@ dependencies = vs.get_dependencies(collection)
 # or dependencies = vs.get_dependencies(collection, force_rediscover=True) # Call with collection object and force_rediscover=True to force rediscovery with collection object as the scope.
 print(f"Virtual server depends on: {dependencies}")
 ```
+
+### Simplified Initialisation with Helper Function
+
+For common workflows that combine configuration parsing with certificate loading, the library provides a convenient helper function that handles all initialisation steps automatically:
+
+```python
+from f5_config_parser import load_collection_with_certificates
+
+# Single function call to load configuration and certificates
+# This automatically:
+# 1. Loads the F5 configuration from the input file
+# 2. Extracts certificates from the tar archive
+# 3. Combines configuration and certificates into a single collection
+# 4. Initialises all dependencies including SSL profile to certificate relationships
+# 5. Saves the dependency cache for faster subsequent loads
+collection = load_collection_with_certificates(
+    config_file='/path/to/f5_config_directory',
+    tar_file='/path/to/f5_config_archive.tar'
+)
+
+# The collection is now ready to use with all dependencies resolved
+ssl_profiles = collection.filter(prefix=('ltm', 'profile', 'client-ssl'))
+certificates = collection.filter(prefix=('certificate', 'object'))
+
+# SSL profiles can immediately access their certificate dependencies
+for profile in ssl_profiles:
+    profile_certs = collection.get_related_stanzas(
+        [profile], 
+        'dependencies'
+    ).filter(prefix=('certificate', 'object'))
+    print(f"{profile.name} uses {len(profile_certs)} certificates")
+```
+
+**Comparison with Manual Initialisation:**
+
+The helper function replaces this manual workflow:
+
+```python
+# Manual approach (more control, more code)
+from pathlib import Path
+from f5_config_parser.collection import StanzaCollection
+from f5_config_parser.certificates.certificate_loader import load_certificates_from_tar
+
+# Load configuration
+with open('/path/to/f5_config_directory') as f:
+    collection = StanzaCollection.from_config(f.read())
+
+# Load and add certificates
+certificates = load_certificates_from_tar('/path/to/f5_config_archive.tar')
+collection += certificates
+
+# Reinitialise dependencies to include certificates
+collection.initialise_dependencies()
+
+# Save dependency cache
+collection.save_dependency_cache()
+```
+
+**When to Use the Helper Function:**
+
+Use `load_collection_with_certificates()` when:
+- You need both configuration and certificates in a single operation
+- You want automatic dependency initialisation including certificate relationships
+- You prefer a simple, streamlined API for common workflows
+- You're writing scripts or tools where conciseness matters
+
+Use manual initialisation when:
+- You need fine-grained control over the initialisation process
+- You're working with configuration only (no certificates)
+- You want to disable automatic dependency resolution for performance
+- You're building custom workflows with multiple configuration sources
+
+**Helper Function Parameters:**
+
+```python
+load_collection_with_certificates(
+    config_file,           # Path to F5 configuration file or directory
+    tar_file,              # Path to F5 tar archive containing certificates
+    load_pem_data=True,    # Whether to load raw PEM data from certificates
+    initialise=True        # Whether to initialise dependencies automatically
+)
+```
+
+The helper function provides the same functionality as manual initialisation but with significantly less code, making it ideal for common certificate analysis workflows.
 
 ### Working with Certificates
 
