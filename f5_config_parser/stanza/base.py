@@ -24,6 +24,7 @@ class ConfigStanza:
         self._parsed_config: Optional[Dict[str, Any]] = None
         self._dependencies: Optional[List[str]] = None
         self._dependents: Optional[List[str]] = None
+        self._dependency_map: Optional[Dict[Tuple[str, str], List[str]]] = None
 
         # Compute and store frozen content hash for stable equality/hashing
         normalised_content = '\n'.join(
@@ -129,6 +130,10 @@ class ConfigStanza:
                     dependents.append(stanza.full_path)
         return dependents
 
+    def _discover_dependency_map(self, collection: 'StanzaCollection') -> Dict[Tuple[str, str], List[str]]:
+        """Override in subclasses to map config values to their dependencies using tuple keys (attribute_name, value)"""
+        return {}
+
     def get_dependencies(self, collection: Optional['StanzaCollection'] = None,
                          force_rediscover: bool = False) -> List[str]:
         """
@@ -215,16 +220,60 @@ class ConfigStanza:
         self._dependents = self._discover_dependents(collection)
         return self._dependents
 
+    def get_dependency_map(self, collection: Optional['StanzaCollection'] = None,
+                           force_rediscover: bool = False) -> Dict[Tuple[str, str], List[str]]:
+        """
+        Get dependency map with flexible caching behaviour.
+
+        Args:
+            collection: Optional collection to discover dependency map against.
+                       Required for initial discovery or when force_rediscover=True.
+            force_rediscover: If True, forces rediscovery even if dependency map is cached.
+                             If False and dependency map is cached, returns cached result
+                             regardless of collection parameter.
+
+        Returns:
+            Dictionary mapping (attribute_name, config_value) tuples to their dependency full paths
+
+        Raises:
+            ValueError: If dependency map hasn't been discovered and no collection provided,
+                       or if force_rediscover=True but no collection provided.
+        """
+        if force_rediscover:
+            if collection is None:
+                raise ValueError(
+                    f"Cannot force rediscovery for '{self.full_path}' without a collection parameter."
+                )
+            # Force rediscovery with collection
+            self._dependency_map = self._discover_dependency_map(collection)
+            return self._dependency_map
+
+        # If cached, return cache regardless of collection parameter
+        if self._dependency_map is not None:
+            return self._dependency_map
+
+        # Not cached - need collection to discover
+        if collection is None:
+            raise ValueError(
+                f"Dependency map for '{self.full_path}' hasn't been discovered yet. "
+                "Call with a collection parameter first."
+            )
+
+        # Discover and cache
+        self._dependency_map = self._discover_dependency_map(collection)
+        return self._dependency_map
+
     @property
     def full_path(self) -> str:
         """Complete stanza identifier: prefix + name"""
         return f"{' '.join(self.prefix)} {self.name}"
 
     def _invalidate_cache(self):
-        """Reset parsed config and dependencies/dependents cache"""
+        """Reset parsed config, dependencies, dependents, and dependency map cache"""
         self._parsed_config = None
         self._dependencies = None
         self._dependents = None
+        self._dependency_map = None
 
     @property
     def parsed_config(self) -> Dict[str, Any]:

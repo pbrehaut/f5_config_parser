@@ -13,3 +13,4 @@ from f5_config_parser.stanza.selfip import SelfIPStanza
 from f5_config_parser.stanza.route import RouteStanza
 from f5_config_parser.stanza.snatpool import SNATPoolStanza
 from f5_config_parser.stanza.monitor import HTTPSMonitorStanza
+from f5_config_parser.stanza.vlan import VlanStanza

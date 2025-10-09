@@ -128,6 +128,9 @@ class StanzaCollection:
     def __len__(self) -> int:
         return len(self.stanzas)
 
+    def __bool__(self) -> bool:
+        return bool(self.stanzas)
+
     def __str__(self) -> str:
         return ''.join([str(stanza) for stanza in self.stanzas])
 

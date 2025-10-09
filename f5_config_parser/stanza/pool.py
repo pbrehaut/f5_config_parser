@@ -1,7 +1,7 @@
 from f5_config_parser.stanza.generic import ConfigStanza
 from f5_config_parser.stanza.utils import _parse_monitor_expression, _is_ip_address
 from f5_config_parser.stanza.partition_ip_rd_parser import extract_fields
-from typing import TYPE_CHECKING, List, Dict, Any
+from typing import TYPE_CHECKING, List, Dict, Any, Tuple
 
 if TYPE_CHECKING:
     from f5_config_parser.collection import StanzaCollection
@@ -83,3 +83,62 @@ class PoolStanza(ConfigStanza):
                     dependency_paths.append(node_path)
 
         return dependency_paths
+
+    def _discover_dependency_map(self, collection: 'StanzaCollection') -> Dict[Tuple[str, str], List[str]]:
+        """Map config values to their dependencies using tuple keys (attribute_name, value)"""
+        dependency_map = {}
+
+        # Monitor mapping
+        monitor = self.get_config_value('monitor')
+        if monitor:
+            monitor_dependencies = []
+            monitor_names = _parse_monitor_expression(monitor)
+            for monitor_name in monitor_names:
+                monitor_path = collection.resolve_object_by_name(monitor_name, ("ltm", "monitor"))
+                if monitor_path:
+                    monitor_dependencies.append(monitor_path)
+
+            if monitor_dependencies:
+                dependency_map[("monitor", monitor)] = monitor_dependencies
+
+        # Member mapping
+        members = self.get_config_value('members')
+        if isinstance(members, dict):
+            for member_name, member_config in members.items():
+                member_dependencies = []
+
+                # Extract node name from member (remove :port if present)
+                node_name = member_name.split(':')[0]
+
+                # Check for IP-based dependencies (Self IP or Route)
+                if 'ip_rd' in member_config:
+                    ip_rd = member_config['ip_rd']
+                    # First check Self IP stanzas
+                    self_ip_stanzas = collection.filter(prefix=("net", "self"))
+                    ip_found = False
+                    for self_ip_stanza in self_ip_stanzas:
+                        if ip_rd in self_ip_stanza:
+                            member_dependencies.append(self_ip_stanza.full_path)
+                            ip_found = True
+
+                    # If no Self IP match, check Route stanzas for longest match
+                    if not ip_found:
+                        matching_route_stanzas = []
+                        route_stanzas = collection.filter(prefix=("net", "route"))
+                        for route_stanza in route_stanzas:
+                            if ip_rd in route_stanza:
+                                matching_route_stanzas.append(route_stanza)
+                        if matching_route_stanzas:
+                            best_route_stanza = max(matching_route_stanzas, key=len)
+                            member_dependencies.append(best_route_stanza.full_path)
+
+                # Try to find node object
+                node_path = collection.resolve_object_by_name(node_name, ("ltm", "node"))
+                if node_path:
+                    member_dependencies.append(node_path)
+
+                # Add to map if we found any dependencies for this member
+                if member_dependencies:
+                    dependency_map[("members", member_name)] = member_dependencies
+
+        return dependency_map

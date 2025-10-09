@@ -13,6 +13,7 @@ from f5_config_parser.stanza import (
     DataGroupStanza,
     SelfIPStanza,
     RouteStanza,
+    VlanStanza,
     SNATPoolStanza,
     HTTPSMonitorStanza
 )
@@ -156,6 +157,7 @@ class StanzaFactory:
             ("ltm", "data-group", "internal"): DataGroupStanza,
             ("net", "self"): SelfIPStanza,
             ("net", "route"): RouteStanza,
+            ("net", "vlan"): VlanStanza,
             ("security", "protocol-inspection", "compliance-objects"): CliAdminPartitionsStanza,
         }
         stanza_class = registry.get(prefix, GenericStanza)

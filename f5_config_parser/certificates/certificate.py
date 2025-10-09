@@ -166,8 +166,21 @@ class Certificate(ConfigStanza):
         """
         Override string representation for certificate objects
         """
-        # Certificates don't have traditional F5 config format
-        return f"{self.full_path} {{\n    # Certificate: {self.filename}\n    # Subject: {self.subject}\n}}\n"
+        lines = [f"{self.full_path} {{"]
+        lines.append(f"    # Certificate: {self.filename}")
+        lines.append(f"    # Subject: {self.subject}")
+        lines.append(f"    # Expiry: {self.not_valid_after.strftime('%Y-%m-%d')}")
+        lines.append(f"    # Issuer: {self.issuer}")
+
+        if self.is_ca and self.ski:
+            lines.append(f"    # SKI: {self.ski}")
+
+        if self.aki:
+            lines.append(f"    # AKI: {self.aki}")
+
+        lines.append("}\n")
+
+        return "\n".join(lines)
 
     def __hash__(self) -> int:
         """Hash based on full path and cert id for uniqueness in collections"""
