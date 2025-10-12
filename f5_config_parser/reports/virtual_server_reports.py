@@ -1,21 +1,25 @@
 from f5_config_parser import load_collection_with_certificates
+from f5_config_parser.reports.collection_to_html import collection_to_html
 import pandas as pd
 import os
-from typing import Dict, List
+from typing import Dict
 
 
 def generate_virtual_server_report(
         input_file: str,
+        output_dir: str,
         tar_file: str,
-        output_dir: str
+        output_filename: str = None
 ) -> Dict[str, str]:
     """
     Generate virtual server report with network dependencies.
 
     Args:
         input_file: Path to the F5 configuration file
+        output_dir: Base directory where reports will be saved
         tar_file: Path to the tar file containing certificates
-        output_dir: Directory where reports and configs will be saved
+        output_filename: Optional base filename for reports (without extension).
+                        If not provided, defaults to 'virtual_server_report'
 
     Returns:
         Dictionary containing paths to generated files:
@@ -23,9 +27,23 @@ def generate_virtual_server_report(
         - 'excel': Path to Excel report
         - 'config_dir': Path to directory containing config files
     """
-    # Create output directories
-    config_dir = os.path.join(output_dir, "configs")
-    os.makedirs(output_dir, exist_ok=True)
+    # Validate input file exists
+    if not os.path.exists(input_file):
+        raise FileNotFoundError(f"Configuration file not found: {input_file}")
+    if not os.path.exists(tar_file):
+        raise FileNotFoundError(f"Tar file not found: {tar_file}")
+
+    # Determine base filename
+    if output_filename is None:
+        base_filename = "virtual_server_report"
+    else:
+        # Strip any extension from the provided filename
+        base_filename = os.path.splitext(output_filename)[0]
+
+    # Create subdirectory for virtual server reports
+    vs_dir = os.path.join(output_dir, "virtual_servers")
+    config_dir = os.path.join(vs_dir, "configs")
+    os.makedirs(vs_dir, exist_ok=True)
     os.makedirs(config_dir, exist_ok=True)
 
     # Load configuration
@@ -131,12 +149,13 @@ def generate_virtual_server_report(
 
         # Create a safe filename from the virtual server name
         safe_name = vs.name.replace('/', '_').replace('\\', '_')
-        config_filename = f"{safe_name}.txt"
+        config_filename = f"{safe_name}.html"
         config_filepath = os.path.join(config_dir, config_filename)
 
-        # Write the configuration to file
+        # Generate and write HTML configuration
+        html_config = collection_to_html(vs_all)
         with open(config_filepath, 'w', encoding='utf-8') as f:
-            f.write(str(vs_all))
+            f.write(html_config)
 
         # Determine maximum number of rows needed
         max_rows = max(len(pool_members), len(cert_cns), len(vs_vlans), 1)
@@ -161,7 +180,7 @@ def generate_virtual_server_report(
 
     # Export to Excel
     df = pd.DataFrame(report_data)
-    excel_file = os.path.join(output_dir, "virtual_server_report.xlsx")
+    excel_file = os.path.join(vs_dir, f"{base_filename}.xlsx")
     df.to_excel(excel_file, index=False)
 
     # Generate HTML table with hyperlinks
@@ -243,11 +262,11 @@ def generate_virtual_server_report(
 """
 
     # Write HTML file
-    html_file = os.path.join(output_dir, "virtual_server_report.html")
+    html_file = os.path.join(vs_dir, f"{base_filename}.html")
     with open(html_file, 'w', encoding='utf-8') as f:
         f.write(html_content)
 
-    print(f"Report generated successfully!")
+    print(f"Virtual server report generated successfully!")
     print(f"HTML report: {html_file}")
     print(f"Excel report: {excel_file}")
     print(f"Configuration files: {config_dir}")

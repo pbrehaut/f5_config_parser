@@ -244,6 +244,15 @@ class StanzaCollection:
 
         return self
 
+    def sort(self) -> 'StanzaCollection':
+        """Sort stanzas with ltm virtual taking precedence, then alphabetically by full_path.
+
+        Returns:
+            Self for method chaining
+        """
+        self.stanzas.sort()
+        return self
+
     def _normalise_items(self, items: Union[ConfigStanza, List[ConfigStanza], 'StanzaCollection']) -> List[
         ConfigStanza]:
         """Convert supported input types to list of ConfigStanza objects."""

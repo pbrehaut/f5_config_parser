@@ -82,7 +82,7 @@ class PoolStanza(ConfigStanza):
                 if node_path:
                     dependency_paths.append(node_path)
 
-        return dependency_paths
+        return list(set(dependency_paths))
 
     def _discover_dependency_map(self, collection: 'StanzaCollection') -> Dict[Tuple[str, str], List[str]]:
         """Map config values to their dependencies using tuple keys (attribute_name, value)"""

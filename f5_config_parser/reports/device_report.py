@@ -1,7 +1,7 @@
 from f5_config_parser.collection import StanzaCollection
 import pandas as pd
-
-from f5_config_parser.collection import StanzaCollection
+import os
+from typing import Dict
 
 
 def build_system_tables(base_stanzas: StanzaCollection) -> dict[str, list[dict]]:
@@ -458,7 +458,38 @@ def _parse_modules_string(modules_str: str) -> list[str]:
     return [m for m in modules if m]
 
 
-def generate_device_report(input_file: str):
+def generate_device_report(input_file: str, output_dir: str, output_filename: str = None) -> Dict[str, str]:
+    """
+    Generate device and system configuration report.
+
+    Args:
+        input_file: Path to the F5 configuration file
+        output_dir: Base directory where reports will be saved
+        output_filename: Optional filename for the Excel report.
+                        If not provided, defaults to 'system_report.xlsx'
+
+    Returns:
+        Dictionary containing path to generated file:
+        - 'excel': Path to Excel report
+    """
+    # Validate input file exists
+    if not os.path.exists(input_file):
+        raise FileNotFoundError(f"Configuration file not found: {input_file}")
+
+    # Determine filename
+    if output_filename is None:
+        filename = "system_report.xlsx"
+    else:
+        # Ensure .xlsx extension
+        if not output_filename.endswith('.xlsx'):
+            filename = f"{output_filename}.xlsx"
+        else:
+            filename = output_filename
+
+    # Create subdirectory for device reports
+    device_dir = os.path.join(output_dir, "devices")
+    os.makedirs(device_dir, exist_ok=True)
+
     # Load configuration
     with open(input_file) as f:
         all_stanzas = StanzaCollection.from_config(f.read())
@@ -515,11 +546,16 @@ def generate_device_report(input_file: str):
     system_tables = build_system_tables(base_stanzas)
 
     # Export to Excel
-    output_file = 'system_report.xlsx'
-    with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
+    excel_file = os.path.join(device_dir, filename)
+    with pd.ExcelWriter(excel_file, engine='openpyxl') as writer:
         for sheet_name, table_data in system_tables.items():
             if table_data:  # Only write non-empty tables
                 df = pd.DataFrame(table_data)
                 df.to_excel(writer, sheet_name=sheet_name, index=False)
 
-    print(f"System report saved to {output_file}")
+    print(f"Device report generated successfully!")
+    print(f"Excel report: {excel_file}")
+
+    return {
+        'excel': excel_file
+    }

@@ -1,8 +1,10 @@
 from f5_config_parser.collection import StanzaCollection
 import pandas as pd
+import os
+from typing import Dict, Tuple
 
 
-def build_network_relationships(all_stanzas: StanzaCollection) -> tuple[list[dict], list[dict]]:
+def build_network_relationships(all_stanzas: StanzaCollection) -> Tuple[list[dict], list[dict]]:
     """
     Build consolidated network relationship tables linking routes, self IPs, VLANs, and interfaces.
 
@@ -147,7 +149,38 @@ def _extract_vlan_info(self_ip, related_stanzas, all_stanzas) -> dict:
     return {'base': base_info, 'interfaces': interfaces_list}
 
 
-def generate_base_network_report(input_file: str):
+def generate_network_report(input_file: str, output_dir: str, output_filename: str = None) -> Dict[str, str]:
+    """
+    Generate network configuration report.
+
+    Args:
+        input_file: Path to the F5 configuration file
+        output_dir: Base directory where reports will be saved
+        output_filename: Optional filename for the Excel report.
+                        If not provided, defaults to 'network_report.xlsx'
+
+    Returns:
+        Dictionary containing path to generated file:
+        - 'excel': Path to Excel report
+    """
+    # Validate input file exists
+    if not os.path.exists(input_file):
+        raise FileNotFoundError(f"Configuration file not found: {input_file}")
+
+    # Determine filename
+    if output_filename is None:
+        filename = "network_report.xlsx"
+    else:
+        # Ensure .xlsx extension
+        if not output_filename.endswith('.xlsx'):
+            filename = f"{output_filename}.xlsx"
+        else:
+            filename = output_filename
+
+    # Create subdirectory for network reports
+    network_dir = os.path.join(output_dir, "network")
+    os.makedirs(network_dir, exist_ok=True)
+
     # Load configuration
     with open(input_file) as f:
         all_stanzas = StanzaCollection.from_config(f.read())
@@ -161,7 +194,6 @@ def generate_base_network_report(input_file: str):
         ('net', 'route-domain'),
         ('net', 'interface'),
         ('net', 'trunk'),
-
     )
 
     base_stanzas = all_stanzas.filter(tuple_filters[0])
@@ -182,9 +214,14 @@ def generate_base_network_report(input_file: str):
     self_ips_df = pd.DataFrame(self_ip_table)
 
     # Export to Excel with multiple sheets
-    output_file = 'f5_network_report.xlsx'
-    with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
+    excel_file = os.path.join(network_dir, filename)
+    with pd.ExcelWriter(excel_file, engine='openpyxl') as writer:
         routes_df.to_excel(writer, sheet_name='Routes', index=False)
         self_ips_df.to_excel(writer, sheet_name='Self IPs', index=False)
 
-    print(f"Report saved to {output_file}")
+    print(f"Network report generated successfully!")
+    print(f"Excel report: {excel_file}")
+
+    return {
+        'excel': excel_file
+    }

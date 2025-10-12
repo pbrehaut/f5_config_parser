@@ -4,7 +4,7 @@ from f5_config_parser.stanza import ConfigStanza, NodeStanza, PoolStanza, Virtua
 
 
 def test_stanza_ordering_by_full_path():
-    """Test that stanzas are sorted alphabetically by full_path"""
+    """Test that stanzas are sorted with ltm virtual taking precedence, then alphabetically by full_path"""
     # Create instances with different full_path values
     stanzas = [
         PoolStanza(
@@ -26,17 +26,30 @@ def test_stanza_ordering_by_full_path():
             prefix=("ltm", "rule"),
             name="b-rule",
             config_lines=["when HTTP_REQUEST { log local0. \"test\" }"]
+        ),
+        VirtualServerStanza(
+            prefix=("ltm", "virtual"),
+            name="z-virtual",
+            config_lines=["destination 192.168.1.101:80"]
         )
     ]
 
     # Sort the list
     sorted_stanzas = sorted(stanzas)
 
-    # Get the full_path values to verify alphabetical ordering
+    # Get the full_path values to verify ordering
     sorted_paths = [s.full_path for s in sorted_stanzas]
 
-    # Verify they're sorted alphabetically by full_path
-    assert sorted_paths == sorted(sorted_paths)
+    # Verify ltm virtual items come first, then alphabetically sorted
+    expected_paths = [
+        "ltm virtual a-virtual",
+        "ltm virtual z-virtual",
+        "ltm node m-node",
+        "ltm pool z-pool",
+        "ltm rule b-rule"
+    ]
+
+    assert sorted_paths == expected_paths
 
 
 def test_stanza_ordering_same_prefix_different_names():

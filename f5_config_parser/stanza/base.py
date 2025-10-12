@@ -67,9 +67,17 @@ class ConfigStanza:
             return lines
 
     def __lt__(self, other):
-        """Sort by full_path attribute"""
+        """Sort by full_path attribute, with ('ltm', 'virtual') prefix taking precedence"""
         if not isinstance(other, ConfigStanza):
             return NotImplemented
+
+        self_is_ltm_virtual = self.prefix == ('ltm', 'virtual')
+        other_is_ltm_virtual = other.prefix == ('ltm', 'virtual')
+
+        if self_is_ltm_virtual and not other_is_ltm_virtual:
+            return True
+        if not self_is_ltm_virtual and other_is_ltm_virtual:
+            return False
 
         return self.full_path < other.full_path
 
