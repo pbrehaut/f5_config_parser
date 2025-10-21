@@ -63,12 +63,12 @@ class TestCertificateEqualityAndHashing:
         cert2_data, cert2_pem = self.create_test_certificate("test.example.com", serial_num, temp_cert_dir, "cert2.crt")
 
         clean_to_filesystem = {
-            "cert1.crt": "cert1.crt",
-            "cert2.crt": "cert2.crt"
+            ('certificate', "cert1.crt"): "cert1.crt",
+            ('certificate', "cert2.crt"): "cert2.crt"
         }
 
-        cert1 = Certificate("cert1.crt", "cert1.crt", temp_cert_dir, clean_to_filesystem)
-        cert2 = Certificate("cert2.crt", "cert2.crt", temp_cert_dir, clean_to_filesystem)
+        cert1 = Certificate(('certificate', "cert1.crt"), "cert1.crt", temp_cert_dir, clean_to_filesystem)
+        cert2 = Certificate(('certificate', "cert2.crt"), "cert2.crt", temp_cert_dir, clean_to_filesystem)
 
         # They should NOT be equal (different full_path and cert_id)
         assert cert1 != cert2
@@ -82,11 +82,11 @@ class TestCertificateEqualityAndHashing:
         """Test that certificates with same path and cert_id are equal"""
         cert1_data, cert1_pem = self.create_test_certificate("test.example.com", 12345, temp_cert_dir, "cert1.crt")
 
-        clean_to_filesystem = {"cert1.crt": "cert1.crt"}
+        clean_to_filesystem = {('certificate', "cert1.crt"): "cert1.crt"}
 
         # Create two Certificate objects with same parameters
-        cert1 = Certificate("cert1.crt", "cert1.crt", temp_cert_dir, clean_to_filesystem)
-        cert2 = Certificate("cert1.crt", "cert1.crt", temp_cert_dir, clean_to_filesystem)
+        cert1 = Certificate(('certificate', "cert1.crt"), "cert1.crt", temp_cert_dir, clean_to_filesystem)
+        cert2 = Certificate(('certificate', "cert1.crt"), "cert1.crt", temp_cert_dir, clean_to_filesystem)
 
         # They should be equal (same full_path and cert_id)
         assert cert1 == cert2
@@ -99,8 +99,8 @@ class TestCertificateEqualityAndHashing:
         """Test certificate comparison with strings (compares full_path only)"""
         cert_data, cert_pem = self.create_test_certificate("test.example.com", 12345, temp_cert_dir, "cert.crt")
 
-        clean_to_filesystem = {"cert.crt": "cert.crt"}
-        cert = Certificate("cert.crt", "cert.crt", temp_cert_dir, clean_to_filesystem)
+        clean_to_filesystem = {('certificate', "cert.crt"): "cert.crt"}
+        cert = Certificate(('certificate', "cert.crt"), "cert.crt", temp_cert_dir, clean_to_filesystem)
 
         # Should be equal to its full_path string
         assert cert == cert.full_path
@@ -114,8 +114,8 @@ class TestCertificateEqualityAndHashing:
         """Test that certificates are not equal to other object types"""
         cert_data, cert_pem = self.create_test_certificate("test.example.com", 12345, temp_cert_dir, "cert.crt")
 
-        clean_to_filesystem = {"cert.crt": "cert.crt"}
-        cert = Certificate("cert.crt", "cert.crt", temp_cert_dir, clean_to_filesystem)
+        clean_to_filesystem = {('certificate', "cert.crt"): "cert.crt"}
+        cert = Certificate(('certificate', "cert.crt"), "cert.crt", temp_cert_dir, clean_to_filesystem)
 
         # Should not be equal to other types (except strings which compare to full_path)
         assert cert != 12345
@@ -132,14 +132,14 @@ class TestCertificateEqualityAndHashing:
         cert3_data, cert3_pem = self.create_test_certificate("test.example.com", serial_num, temp_cert_dir, "cert3.crt")
 
         clean_to_filesystem = {
-            "cert1.crt": "cert1.crt",
-            "cert2.crt": "cert2.crt",
-            "cert3.crt": "cert3.crt"
+            ('certificate', "cert1.crt"): "cert1.crt",
+            ('certificate', "cert2.crt"): "cert2.crt",
+            ('certificate', "cert3.crt"): "cert3.crt"
         }
 
-        cert1 = Certificate("cert1.crt", "cert1.crt", temp_cert_dir, clean_to_filesystem)
-        cert2 = Certificate("cert2.crt", "cert2.crt", temp_cert_dir, clean_to_filesystem)
-        cert3 = Certificate("cert3.crt", "cert3.crt", temp_cert_dir, clean_to_filesystem)
+        cert1 = Certificate(('certificate', "cert1.crt"), "cert1.crt", temp_cert_dir, clean_to_filesystem)
+        cert2 = Certificate(('certificate', "cert2.crt"), "cert2.crt", temp_cert_dir, clean_to_filesystem)
+        cert3 = Certificate(('certificate', "cert3.crt"), "cert3.crt", temp_cert_dir, clean_to_filesystem)
 
         # All should be different (different full_path and cert_id)
         assert cert1 != cert2 != cert3
@@ -166,133 +166,123 @@ class TestCertificateEqualityAndHashing:
         cert3_data, cert3_pem = self.create_test_certificate("test3.example.com", 33333, temp_cert_dir, "cert3.crt")
 
         clean_to_filesystem = {
-            "cert1.crt": "cert1.crt",
-            "cert2.crt": "cert2.crt",
-            "cert3.crt": "cert3.crt"
+            ('certificate', "cert1.crt"): "cert1.crt",
+            ('certificate', "cert2.crt"): "cert2.crt",
+            ('certificate', "cert3.crt"): "cert3.crt"
         }
 
-        cert1 = Certificate("cert1.crt", "cert1.crt", temp_cert_dir, clean_to_filesystem)
-        cert2 = Certificate("cert2.crt", "cert2.crt", temp_cert_dir, clean_to_filesystem)
-        cert3 = Certificate("cert3.crt", "cert3.crt", temp_cert_dir, clean_to_filesystem)
+        cert1 = Certificate(('certificate', "cert1.crt"), "cert1.crt", temp_cert_dir, clean_to_filesystem)
+        cert2 = Certificate(('certificate', "cert2.crt"), "cert2.crt", temp_cert_dir, clean_to_filesystem)
+        cert3 = Certificate(('certificate', "cert3.crt"), "cert3.crt", temp_cert_dir, clean_to_filesystem)
 
         # All should be different
         assert cert1 != cert2
         assert cert2 != cert3
         assert cert1 != cert3
 
-        # Create a set - should contain all three certificates
+        # Create a set
         cert_set = {cert1, cert2, cert3}
         assert len(cert_set) == 3
 
-        # All should be in the set
+        # Test set membership
         assert cert1 in cert_set
         assert cert2 in cert_set
         assert cert3 in cert_set
 
-    def test_certificate_set_union_operations(self, temp_cert_dir):
-        """Test set union operations between certificate collections"""
-        # Create collection 1
-        cert1_data, cert1_pem = self.create_test_certificate("cert1.example.com", 10001, temp_cert_dir, "cert1.crt")
-        cert2_data, cert2_pem = self.create_test_certificate("cert2.example.com", 10002, temp_cert_dir, "cert2.crt")
-        cert3_data, cert3_pem = self.create_test_certificate("shared.example.com", 10003, temp_cert_dir, "cert3.crt")
-
-        # Create collection 2 - all different paths so all different certificates
-        cert4_data, cert4_pem = self.create_test_certificate("cert4.example.com", 20001, temp_cert_dir, "cert4.crt")
-        cert5_data, cert5_pem = self.create_test_certificate("cert5.example.com", 20002, temp_cert_dir, "cert5.crt")
-        cert6_data, cert6_pem = self.create_test_certificate("shared.example.com", 10003, temp_cert_dir, "cert6.crt")
-
-        clean_to_filesystem = {
-            "cert1.crt": "cert1.crt", "cert2.crt": "cert2.crt", "cert3.crt": "cert3.crt",
-            "cert4.crt": "cert4.crt", "cert5.crt": "cert5.crt", "cert6.crt": "cert6.crt"
-        }
-
-        cert1 = Certificate("cert1.crt", "cert1.crt", temp_cert_dir, clean_to_filesystem)
-        cert2 = Certificate("cert2.crt", "cert2.crt", temp_cert_dir, clean_to_filesystem)
-        cert3 = Certificate("cert3.crt", "cert3.crt", temp_cert_dir, clean_to_filesystem)
-        cert4 = Certificate("cert4.crt", "cert4.crt", temp_cert_dir, clean_to_filesystem)
-        cert5 = Certificate("cert5.crt", "cert5.crt", temp_cert_dir, clean_to_filesystem)
-        cert6 = Certificate("cert6.crt", "cert6.crt", temp_cert_dir, clean_to_filesystem)
-
-        # Verify cert3 and cert6 are different (different paths and cert_ids)
-        assert cert3 != cert6  # Different full_path and cert_id
-        assert hash(cert3) != hash(cert6)  # Different paths
-
-        # Create two collections
-        collection1 = {cert1, cert2, cert3}
-        collection2 = {cert4, cert5, cert6}
-
-        # Union should contain ALL 6 certificates (all have different paths/cert_ids)
-        union_set = collection1 | collection2
-        assert len(union_set) == 6
-
-        # All certificates should be in the union
+        # Test set union
+        set1 = {cert1, cert2}
+        set2 = {cert2, cert3}
+        union_set = set1 | set2
+        assert len(union_set) == 3  # cert1, cert2, cert3
         assert cert1 in union_set
         assert cert2 in union_set
         assert cert3 in union_set
-        assert cert4 in union_set
-        assert cert5 in union_set
-        assert cert6 in union_set
 
-    def test_certificate_set_intersection_operations(self, temp_cert_dir):
-        """Test set intersection operations between certificate collections"""
-        # Create unique certificates by path
-        cert1_data, cert1_pem = self.create_test_certificate("cert1.example.com", 99991, temp_cert_dir, "cert1.crt")
-        cert2_data, cert2_pem = self.create_test_certificate("cert2.example.com", 99992, temp_cert_dir, "cert2.crt")
-        cert3_data, cert3_pem = self.create_test_certificate("cert3.example.com", 99993, temp_cert_dir, "cert3.crt")
-        cert4_data, cert4_pem = self.create_test_certificate("cert4.example.com", 99994, temp_cert_dir, "cert4.crt")
+        # Test set intersection
+        intersection_set = set1 & set2
+        assert len(intersection_set) == 1  # Only cert2
+        assert cert2 in intersection_set
+        assert cert1 not in intersection_set
+        assert cert3 not in intersection_set
+
+        # Test set difference
+        diff_set = set1 - set2
+        assert len(diff_set) == 1  # Only cert1
+        assert cert1 in diff_set
+        assert cert2 not in diff_set
+        assert cert3 not in diff_set
+
+    def test_certificate_deduplication_in_sets(self, temp_cert_dir):
+        """Test that duplicate Certificate objects are correctly deduplicated in sets"""
+        cert_data, cert_pem = self.create_test_certificate("test.example.com", 12345, temp_cert_dir, "cert.crt")
+
+        clean_to_filesystem = {('certificate', "cert.crt"): "cert.crt"}
+
+        # Create multiple Certificate objects with identical parameters
+        cert1 = Certificate(('certificate', "cert.crt"), "cert.crt", temp_cert_dir, clean_to_filesystem)
+        cert2 = Certificate(('certificate', "cert.crt"), "cert.crt", temp_cert_dir, clean_to_filesystem)
+        cert3 = Certificate(('certificate', "cert.crt"), "cert.crt", temp_cert_dir, clean_to_filesystem)
+
+        # All should be equal
+        assert cert1 == cert2 == cert3
+
+        # When added to a set, should be deduplicated (same full_path and cert_id)
+        cert_set = {cert1, cert2, cert3}
+        assert len(cert_set) == 1  # Should only contain one unique certificate
+
+        # The one in the set should be equal to all three
+        cert_in_set = list(cert_set)[0]
+        assert cert_in_set == cert1
+        assert cert_in_set == cert2
+        assert cert_in_set == cert3
+
+    def test_certificate_set_operations_with_overlapping_collections(self, temp_cert_dir):
+        """Test set operations with overlapping collections of certificates"""
+        # Create 5 certificates
+        cert_data1, cert_pem1 = self.create_test_certificate("test1.example.com", 11111, temp_cert_dir, "cert1.crt")
+        cert_data2, cert_pem2 = self.create_test_certificate("test2.example.com", 22222, temp_cert_dir, "cert2.crt")
+        cert_data_shared, cert_pem_shared = self.create_test_certificate("shared.example.com", 99999, temp_cert_dir,
+                                                                         "shared.crt")
+        cert_data3, cert_pem3 = self.create_test_certificate("test3.example.com", 33333, temp_cert_dir, "cert3.crt")
+        cert_data4, cert_pem4 = self.create_test_certificate("test4.example.com", 44444, temp_cert_dir, "cert4.crt")
 
         clean_to_filesystem = {
-            "cert1.crt": "cert1.crt", "cert2.crt": "cert2.crt",
-            "cert3.crt": "cert3.crt", "cert4.crt": "cert4.crt"
+            ('certificate', "cert1.crt"): "cert1.crt",
+            ('certificate', "cert2.crt"): "cert2.crt",
+            ('certificate', "shared.crt"): "shared.crt",
+            ('certificate', "cert3.crt"): "cert3.crt",
+            ('certificate', "cert4.crt"): "cert4.crt"
         }
 
-        cert1 = Certificate("cert1.crt", "cert1.crt", temp_cert_dir, clean_to_filesystem)
-        cert2 = Certificate("cert2.crt", "cert2.crt", temp_cert_dir, clean_to_filesystem)
-        cert3 = Certificate("cert3.crt", "cert3.crt", temp_cert_dir, clean_to_filesystem)
-        cert4 = Certificate("cert4.crt", "cert4.crt", temp_cert_dir, clean_to_filesystem)
+        cert1 = Certificate(('certificate', "cert1.crt"), "cert1.crt", temp_cert_dir, clean_to_filesystem)
+        cert2 = Certificate(('certificate', "cert2.crt"), "cert2.crt", temp_cert_dir, clean_to_filesystem)
+        shared = Certificate(('certificate', "shared.crt"), "shared.crt", temp_cert_dir, clean_to_filesystem)
+        cert3 = Certificate(('certificate', "cert3.crt"), "cert3.crt", temp_cert_dir, clean_to_filesystem)
+        cert4 = Certificate(('certificate', "cert4.crt"), "cert4.crt", temp_cert_dir, clean_to_filesystem)
 
-        # Create two collections with no overlapping certificates
-        collection1 = {cert1, cert2}
-        collection2 = {cert3, cert4}
-
-        # Intersection should be EMPTY (no shared certificates)
-        intersection_set = collection1 & collection2
-        assert len(intersection_set) == 0
-
-        # Create collections with shared certificate (same object)
-        collection3 = {cert1, cert2}
-        collection4 = {cert2, cert3}  # cert2 is shared
-
-        # Intersection should contain shared certificate
-        intersection_set2 = collection3 & collection4
-        assert len(intersection_set2) == 1
-        assert cert2 in intersection_set2
-
-    def test_certificate_set_difference_operations(self, temp_cert_dir):
-        """Test set difference operations between certificate collections"""
-        # Create certificates for collections
-        cert1_data, cert1_pem = self.create_test_certificate("cert1.example.com", 11111, temp_cert_dir, "cert1.crt")
-        cert2_data, cert2_pem = self.create_test_certificate("cert2.example.com", 11112, temp_cert_dir, "cert2.crt")
-        cert3_data, cert3_pem = self.create_test_certificate("cert3.example.com", 22221, temp_cert_dir, "cert3.crt")
-        cert4_data, cert4_pem = self.create_test_certificate("cert4.example.com", 22222, temp_cert_dir, "cert4.crt")
-        shared_data, shared_pem = self.create_test_certificate("shared.example.com", 99999, temp_cert_dir, "shared.crt")
-
-        clean_to_filesystem = {
-            "cert1.crt": "cert1.crt", "cert2.crt": "cert2.crt", "cert3.crt": "cert3.crt",
-            "cert4.crt": "cert4.crt", "shared.crt": "shared.crt"
-        }
-
-        cert1 = Certificate("cert1.crt", "cert1.crt", temp_cert_dir, clean_to_filesystem)
-        cert2 = Certificate("cert2.crt", "cert2.crt", temp_cert_dir, clean_to_filesystem)
-        cert3 = Certificate("cert3.crt", "cert3.crt", temp_cert_dir, clean_to_filesystem)
-        cert4 = Certificate("cert4.crt", "cert4.crt", temp_cert_dir, clean_to_filesystem)
-        shared = Certificate("shared.crt", "shared.crt", temp_cert_dir, clean_to_filesystem)
-
-        # Create collections with one shared certificate
+        # Create two collections with overlap
         collection1 = {cert1, cert2, shared}
-        collection2 = {cert3, cert4, shared}
+        collection2 = {shared, cert3, cert4}
 
-        # Difference should contain certificates only in collection1
+        # Test union
+        union_set = collection1 | collection2
+        assert len(union_set) == 5  # All unique certificates
+        assert cert1 in union_set
+        assert cert2 in union_set
+        assert shared in union_set
+        assert cert3 in union_set
+        assert cert4 in union_set
+
+        # Test intersection
+        intersection_set = collection1 & collection2
+        assert len(intersection_set) == 1  # Only shared
+        assert shared in intersection_set
+        assert cert1 not in intersection_set
+        assert cert2 not in intersection_set
+        assert cert3 not in intersection_set
+        assert cert4 not in intersection_set
+
+        # Test difference
         diff_set = collection1 - collection2
         assert len(diff_set) == 2  # cert1 and cert2 only
         assert cert1 in diff_set
@@ -319,8 +309,8 @@ class TestCertificateEqualityAndHashing:
         """Test that certificate hashes are consistent across multiple calls"""
         cert_data, cert_pem = self.create_test_certificate("test.example.com", 12345, temp_cert_dir, "cert.crt")
 
-        clean_to_filesystem = {"cert.crt": "cert.crt"}
-        cert = Certificate("cert.crt", "cert.crt", temp_cert_dir, clean_to_filesystem)
+        clean_to_filesystem = {('certificate', "cert.crt"): "cert.crt"}
+        cert = Certificate(('certificate', "cert.crt"), "cert.crt", temp_cert_dir, clean_to_filesystem)
 
         # Hash should be consistent across multiple calls
         hash1 = hash(cert)
@@ -333,8 +323,8 @@ class TestCertificateEqualityAndHashing:
         """Test that certificate equality is reflexive (a == a)"""
         cert_data, cert_pem = self.create_test_certificate("test.example.com", 12345, temp_cert_dir, "cert.crt")
 
-        clean_to_filesystem = {"cert.crt": "cert.crt"}
-        cert = Certificate("cert.crt", "cert.crt", temp_cert_dir, clean_to_filesystem)
+        clean_to_filesystem = {('certificate', "cert.crt"): "cert.crt"}
+        cert = Certificate(('certificate', "cert.crt"), "cert.crt", temp_cert_dir, clean_to_filesystem)
 
         # Should be equal to itself
         assert cert == cert
@@ -344,12 +334,12 @@ class TestCertificateEqualityAndHashing:
         """Test that certificate equality is transitive (if a == b and b == c, then a == c)"""
         cert_data, cert_pem = self.create_test_certificate("test.example.com", 12345, temp_cert_dir, "cert.crt")
 
-        clean_to_filesystem = {"cert.crt": "cert.crt"}
+        clean_to_filesystem = {('certificate', "cert.crt"): "cert.crt"}
 
         # Create three Certificate objects with identical parameters
-        cert1 = Certificate("cert.crt", "cert.crt", temp_cert_dir, clean_to_filesystem)
-        cert2 = Certificate("cert.crt", "cert.crt", temp_cert_dir, clean_to_filesystem)
-        cert3 = Certificate("cert.crt", "cert.crt", temp_cert_dir, clean_to_filesystem)
+        cert1 = Certificate(('certificate', "cert.crt"), "cert.crt", temp_cert_dir, clean_to_filesystem)
+        cert2 = Certificate(('certificate', "cert.crt"), "cert.crt", temp_cert_dir, clean_to_filesystem)
+        cert3 = Certificate(('certificate', "cert.crt"), "cert.crt", temp_cert_dir, clean_to_filesystem)
 
         # Test transitivity
         assert cert1 == cert2
@@ -368,14 +358,14 @@ class TestCertificateEqualityAndHashing:
                                                              "subdir/cert3.crt")
 
         clean_to_filesystem = {
-            "cert1.crt": "cert1.crt",
-            "cert2.crt": "cert2.crt",
-            "subdir/cert3.crt": "subdir/cert3.crt"
+            ('certificate', "cert1.crt"): "cert1.crt",
+            ('certificate', "cert2.crt"): "cert2.crt",
+            ('certificate', "subdir/cert3.crt"): "subdir/cert3.crt"
         }
 
-        cert1 = Certificate("cert1.crt", "cert1.crt", temp_cert_dir, clean_to_filesystem)
-        cert2 = Certificate("cert2.crt", "cert2.crt", temp_cert_dir, clean_to_filesystem)
-        cert3 = Certificate("subdir/cert3.crt", "subdir/cert3.crt", temp_cert_dir, clean_to_filesystem)
+        cert1 = Certificate(('certificate', "cert1.crt"), "cert1.crt", temp_cert_dir, clean_to_filesystem)
+        cert2 = Certificate(('certificate', "cert2.crt"), "cert2.crt", temp_cert_dir, clean_to_filesystem)
+        cert3 = Certificate(('certificate', "subdir/cert3.crt"), "subdir/cert3.crt", temp_cert_dir, clean_to_filesystem)
 
         certificates = [cert1, cert2, cert3]
 
@@ -409,9 +399,9 @@ class TestCertificateEqualityAndHashing:
             filename = f"cert_{i}.crt"
             cert_data, cert_pem = self.create_test_certificate(f"test{serial_num}.example.com", serial_num,
                                                                temp_cert_dir, filename)
-            clean_to_filesystem[filename] = filename
+            clean_to_filesystem[('certificate', filename)] = filename
 
-            cert = Certificate(filename, filename, temp_cert_dir, clean_to_filesystem)
+            cert = Certificate(('certificate', filename), filename, temp_cert_dir, clean_to_filesystem)
             certificates.append(cert)
 
         # Convert to set - should contain ALL certificates (unique paths and cert_ids)
@@ -449,14 +439,14 @@ def sample_equality_test_data():
                                                                       "cert3.crt")  # Different content
 
         clean_to_filesystem = {
-            "cert1.crt": "cert1.crt",
-            "cert2.crt": "cert2.crt",
-            "cert3.crt": "cert3.crt"
+            ('certificate', "cert1.crt"): "cert1.crt",
+            ('certificate', "cert2.crt"): "cert2.crt",
+            ('certificate', "cert3.crt"): "cert3.crt"
         }
 
-        cert1 = Certificate("cert1.crt", "cert1.crt", temp_dir, clean_to_filesystem)
-        cert2 = Certificate("cert2.crt", "cert2.crt", temp_dir, clean_to_filesystem)
-        cert3 = Certificate("cert3.crt", "cert3.crt", temp_dir, clean_to_filesystem)
+        cert1 = Certificate(('certificate', "cert1.crt"), "cert1.crt", temp_dir, clean_to_filesystem)
+        cert2 = Certificate(('certificate', "cert2.crt"), "cert2.crt", temp_dir, clean_to_filesystem)
+        cert3 = Certificate(('certificate', "cert3.crt"), "cert3.crt", temp_dir, clean_to_filesystem)
 
         # Create collections for testing
         collection1 = {cert1, cert2}  # Should contain 2 certificates (different paths)

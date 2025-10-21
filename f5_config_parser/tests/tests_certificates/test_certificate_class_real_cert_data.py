@@ -196,13 +196,12 @@ class TestCertificateRealisticData:
 
     def test_digicert_ca_certificate(self, temp_cert_dir, digicert_ca_data):
         """Test DigiCert CA certificate with real data attributes"""
-        # Write certificate to file
         cert_file = temp_cert_dir / "DigiCertCA.crt"
         cert_file.write_bytes(digicert_ca_data['cert_pem'])
 
-        clean_to_filesystem = {"/Common/DigiCertCA.crt": "DigiCertCA.crt"}
+        clean_to_filesystem = {('certificate', "/Common/DigiCertCA.crt"): "DigiCertCA.crt"}
 
-        cert = Certificate("/Common/DigiCertCA.crt", "DigiCertCA.crt", temp_cert_dir, clean_to_filesystem)
+        cert = Certificate(('certificate', "/Common/DigiCertCA.crt"), "DigiCertCA.crt", temp_cert_dir, clean_to_filesystem)
 
         expected = digicert_ca_data['expected_attributes']
 
@@ -234,12 +233,12 @@ class TestCertificateRealisticData:
         key_file.write_bytes(signed_cert_data['key_pem'])
 
         clean_to_filesystem = {
-            "/Legacy-CSC/servicedeskdr.aust.csc.com.crt": "servicedeskdr.aust.csc.com.crt",
-            "/Legacy-CSC/servicedeskdr.aust.csc.com.key": "servicedeskdr.aust.csc.com.key"
+            ('certificate', "/Legacy-CSC/servicedeskdr.aust.csc.com.crt"): "servicedeskdr.aust.csc.com.crt",
+            ('key', "/Legacy-CSC/servicedeskdr.aust.csc.com.key"): "servicedeskdr.aust.csc.com.key"
         }
 
         cert = Certificate(
-            "/Legacy-CSC/servicedeskdr.aust.csc.com.crt",
+            ('certificate', "/Legacy-CSC/servicedeskdr.aust.csc.com.crt"),
             "servicedeskdr.aust.csc.com.crt",
             temp_cert_dir,
             clean_to_filesystem
@@ -275,13 +274,13 @@ class TestCertificateRealisticData:
         cert_file.write_bytes(signed_cert_data['cert_pem'])
 
         clean_to_filesystem = {
-            "/Common/DigiCertCA.crt": "DigiCertCA.crt",
-            "/Legacy-CSC/servicedeskdr.aust.csc.com.crt": "servicedeskdr.aust.csc.com.crt"
+            ('certificate', "/Common/DigiCertCA.crt"): "DigiCertCA.crt",
+            ('certificate', "/Legacy-CSC/servicedeskdr.aust.csc.com.crt"): "servicedeskdr.aust.csc.com.crt"
         }
 
-        ca_cert = Certificate("/Common/DigiCertCA.crt", "DigiCertCA.crt", temp_cert_dir, clean_to_filesystem)
+        ca_cert = Certificate(('certificate', "/Common/DigiCertCA.crt"), "DigiCertCA.crt", temp_cert_dir, clean_to_filesystem)
         signed_cert = Certificate(
-            "/Legacy-CSC/servicedeskdr.aust.csc.com.crt",
+            ('certificate', "/Legacy-CSC/servicedeskdr.aust.csc.com.crt"),
             "servicedeskdr.aust.csc.com.crt",
             temp_cert_dir,
             clean_to_filesystem
@@ -302,9 +301,9 @@ class TestCertificateRealisticData:
         ca_file = temp_cert_dir / "DigiCertCA.crt"
         ca_file.write_bytes(digicert_ca_data['cert_pem'])
 
-        clean_to_filesystem = {"/Common/DigiCertCA.crt": "DigiCertCA.crt"}
+        clean_to_filesystem = {('certificate', "/Common/DigiCertCA.crt"): "DigiCertCA.crt"}
 
-        ca_cert = Certificate("/Common/DigiCertCA.crt", "DigiCertCA.crt", temp_cert_dir, clean_to_filesystem)
+        ca_cert = Certificate(('certificate', "/Common/DigiCertCA.crt"), "DigiCertCA.crt", temp_cert_dir, clean_to_filesystem)
 
         ca_repr = repr(ca_cert)
         assert "Certificate CA:" in ca_repr
@@ -316,10 +315,10 @@ class TestCertificateRealisticData:
         cert_file = temp_cert_dir / "servicedeskdr.aust.csc.com.crt"
         cert_file.write_bytes(signed_cert_data['cert_pem'])
 
-        clean_to_filesystem = {"/Legacy-CSC/servicedeskdr.aust.csc.com.crt": "servicedeskdr.aust.csc.com.crt"}
+        clean_to_filesystem = {('certificate', "/Legacy-CSC/servicedeskdr.aust.csc.com.crt"): "servicedeskdr.aust.csc.com.crt"}
 
         signed_cert = Certificate(
-            "/Legacy-CSC/servicedeskdr.aust.csc.com.crt",
+            ('certificate', "/Legacy-CSC/servicedeskdr.aust.csc.com.crt"),
             "servicedeskdr.aust.csc.com.crt",
             temp_cert_dir,
             clean_to_filesystem
@@ -336,10 +335,10 @@ class TestCertificateRealisticData:
         cert_file = temp_cert_dir / "servicedeskdr.aust.csc.com.crt"
         cert_file.write_bytes(signed_cert_data['cert_pem'])
 
-        clean_to_filesystem = {"/Legacy-CSC/servicedeskdr.aust.csc.com.crt": "servicedeskdr.aust.csc.com.crt"}
+        clean_to_filesystem = {('certificate', "/Legacy-CSC/servicedeskdr.aust.csc.com.crt"): "servicedeskdr.aust.csc.com.crt"}
 
         cert = Certificate(
-            "/Legacy-CSC/servicedeskdr.aust.csc.com.crt",
+            ('certificate', "/Legacy-CSC/servicedeskdr.aust.csc.com.crt"),
             "servicedeskdr.aust.csc.com.crt",
             temp_cert_dir,
             clean_to_filesystem
@@ -354,10 +353,10 @@ class TestCertificateRealisticData:
         cert_file = temp_cert_dir / "servicedeskdr.aust.csc.com.crt"
         cert_file.write_bytes(signed_cert_data['cert_pem'])
 
-        clean_to_filesystem = {"/Legacy-CSC/servicedeskdr.aust.csc.com.crt": "servicedeskdr.aust.csc.com.crt"}
+        clean_to_filesystem = {('certificate', "/Legacy-CSC/servicedeskdr.aust.csc.com.crt"): "servicedeskdr.aust.csc.com.crt"}
 
         cert = Certificate(
-            "/Legacy-CSC/servicedeskdr.aust.csc.com.crt",
+            ('certificate', "/Legacy-CSC/servicedeskdr.aust.csc.com.crt"),
             "servicedeskdr.aust.csc.com.crt",
             temp_cert_dir,
             clean_to_filesystem

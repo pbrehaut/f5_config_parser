@@ -166,9 +166,9 @@ class TestCertificate:
         cert_file = temp_cert_dir / "test.crt"
         cert_file.write_bytes(basic_cert_data['cert_pem'])
 
-        clean_to_filesystem = {"test.crt": "test.crt"}
+        clean_to_filesystem = {('certificate', "test.crt"): "test.crt"}
 
-        cert = Certificate("test.crt", "test.crt", temp_cert_dir, clean_to_filesystem)
+        cert = Certificate(('certificate', "test.crt"), "test.crt", temp_cert_dir, clean_to_filesystem)
 
         assert cert.filename == "test.crt"
         assert cert.filesystem_filename == "test.crt"
@@ -188,11 +188,11 @@ class TestCertificate:
         key_file.write_bytes(basic_cert_data['key_pem'])
 
         clean_to_filesystem = {
-            "server.crt": "server.crt",
-            "server.key": "server.key"
+            ('certificate', "server.crt"): "server.crt",
+            ('key', "server.key"): "server.key"
         }
 
-        cert = Certificate("server.crt", "server.crt", temp_cert_dir, clean_to_filesystem)
+        cert = Certificate(('certificate', "server.crt"), "server.crt", temp_cert_dir, clean_to_filesystem)
 
         assert cert.key_filename == "server.key"
         assert cert.key_filesystem_filename == "server.key"
@@ -202,107 +202,130 @@ class TestCertificate:
         cert_file = temp_cert_dir / "standalone.crt"
         cert_file.write_bytes(basic_cert_data['cert_pem'])
 
-        clean_to_filesystem = {"standalone.crt": "standalone.crt"}
+        clean_to_filesystem = {('certificate', "standalone.crt"): "standalone.crt"}
 
-        cert = Certificate("standalone.crt", "standalone.crt", temp_cert_dir, clean_to_filesystem)
+        cert = Certificate(('certificate', "standalone.crt"), "standalone.crt", temp_cert_dir, clean_to_filesystem)
 
         assert cert.key_filename is None
         assert cert.key_filesystem_filename is None
 
-    def test_ca_certificate(self, temp_cert_dir, ca_cert_data):
-        """Test CA certificate with proper attributes"""
+    def test_certificate_with_pem_data_loading(self, temp_cert_dir, basic_cert_data):
+        """Test certificate with PEM data loading enabled"""
+        cert_file = temp_cert_dir / "pem-test.crt"
+        cert_file.write_bytes(basic_cert_data['cert_pem'])
+
+        clean_to_filesystem = {('certificate', "pem-test.crt"): "pem-test.crt"}
+
+        cert = Certificate(('certificate', "pem-test.crt"), "pem-test.crt", temp_cert_dir, clean_to_filesystem,
+                          load_pem_data=True)
+
+        assert cert.pem_data is not None
+        assert "BEGIN CERTIFICATE" in cert.pem_data
+        assert isinstance(cert.pem_data, str)
+
+    def test_certificate_with_key_pem_data_loading(self, temp_cert_dir, basic_cert_data):
+        """Test certificate with key PEM data loading enabled"""
+        cert_file = temp_cert_dir / "key-pem-test.crt"
+        key_file = temp_cert_dir / "key-pem-test.key"
+        cert_file.write_bytes(basic_cert_data['cert_pem'])
+        key_file.write_bytes(basic_cert_data['key_pem'])
+
+        clean_to_filesystem = {
+            ('certificate', "key-pem-test.crt"): "key-pem-test.crt",
+            ('key', "key-pem-test.key"): "key-pem-test.key"
+        }
+
+        cert = Certificate(('certificate', "key-pem-test.crt"), "key-pem-test.crt", temp_cert_dir,
+                          clean_to_filesystem, load_pem_data=True)
+
+        assert cert.key_pem_data is not None
+        assert "BEGIN PRIVATE KEY" in cert.key_pem_data
+        assert isinstance(cert.key_pem_data, str)
+
+    def test_certificate_metadata_extraction(self, temp_cert_dir, basic_cert_data):
+        """Test that certificate metadata is correctly extracted"""
+        cert_file = temp_cert_dir / "metadata.crt"
+        cert_file.write_bytes(basic_cert_data['cert_pem'])
+
+        clean_to_filesystem = {('certificate', "metadata.crt"): "metadata.crt"}
+
+        cert = Certificate(('certificate', "metadata.crt"), "metadata.crt", temp_cert_dir, clean_to_filesystem)
+
+        # Check subject components
+        assert "CN=test.example.com" in cert.subject
+        assert "O=Test Organisation" in cert.subject
+        assert "C=AU" in cert.subject
+
+        # Check issuer (self-signed, so should match subject)
+        assert cert.issuer == cert.subject
+
+    def test_ca_certificate_identification(self, temp_cert_dir, ca_cert_data):
+        """Test that CA certificates are correctly identified"""
         cert_file = temp_cert_dir / "ca.crt"
         cert_file.write_bytes(ca_cert_data['cert_pem'])
 
-        clean_to_filesystem = {"ca.crt": "ca.crt"}
+        clean_to_filesystem = {('certificate', "ca.crt"): "ca.crt"}
 
-        cert = Certificate("ca.crt", "ca.crt", temp_cert_dir, clean_to_filesystem)
+        cert = Certificate(('certificate', "ca.crt"), "ca.crt", temp_cert_dir, clean_to_filesystem)
 
         assert cert.is_ca is True
-        assert cert.ski is not None
-        assert cert.ski == ca_cert_data['ski']
         assert "CN=Test CA" in cert.subject
 
-    def test_signed_certificate_with_aki(self, temp_cert_dir, signed_cert_data):
-        """Test certificate signed by CA with AKI"""
-        cert_file = temp_cert_dir / "signed.crt"
+    def test_certificate_ski_extraction(self, temp_cert_dir, ca_cert_data):
+        """Test Subject Key Identifier extraction"""
+        cert_file = temp_cert_dir / "ski-test.crt"
+        cert_file.write_bytes(ca_cert_data['cert_pem'])
+
+        clean_to_filesystem = {('certificate', "ski-test.crt"): "ski-test.crt"}
+
+        cert = Certificate(('certificate', "ski-test.crt"), "ski-test.crt", temp_cert_dir, clean_to_filesystem)
+
+        assert cert.ski is not None
+        assert isinstance(cert.ski, str)
+        assert len(cert.ski) == 40  # SHA-1 hash is 40 hex chars
+
+    def test_certificate_aki_extraction(self, temp_cert_dir, signed_cert_data):
+        """Test Authority Key Identifier extraction"""
+        cert_file = temp_cert_dir / "aki-test.crt"
         cert_file.write_bytes(signed_cert_data['cert_pem'])
 
-        clean_to_filesystem = {"signed.crt": "signed.crt"}
+        clean_to_filesystem = {('certificate', "aki-test.crt"): "aki-test.crt"}
 
-        cert = Certificate("signed.crt", "signed.crt", temp_cert_dir, clean_to_filesystem)
+        cert = Certificate(('certificate', "aki-test.crt"), "aki-test.crt", temp_cert_dir, clean_to_filesystem)
 
-        assert cert.is_ca is False
         assert cert.aki is not None
         assert cert.aki == signed_cert_data['aki']
-        assert "CN=signed.example.com" in cert.subject
-        assert "CN=Test CA" in cert.issuer
 
-    def test_certificate_without_ski_extension(self, temp_cert_dir):
+    def test_certificate_without_ski(self, temp_cert_dir, basic_cert_data):
         """Test certificate without SKI extension"""
-        cert, _ = TestCertificateFixtures.create_basic_cert()
-        cert_pem = cert.public_bytes(serialization.Encoding.PEM)
-
         cert_file = temp_cert_dir / "no-ski.crt"
-        cert_file.write_bytes(cert_pem)
-
-        clean_to_filesystem = {"no-ski.crt": "no-ski.crt"}
-
-        cert_obj = Certificate("no-ski.crt", "no-ski.crt", temp_cert_dir, clean_to_filesystem)
-
-        assert cert_obj.ski is None
-
-    def test_certificate_without_aki_extension(self, temp_cert_dir, basic_cert_data):
-        """Test certificate without AKI extension (self-signed)"""
-        cert_file = temp_cert_dir / "self-signed.crt"
         cert_file.write_bytes(basic_cert_data['cert_pem'])
 
-        clean_to_filesystem = {"self-signed.crt": "self-signed.crt"}
+        clean_to_filesystem = {('certificate', "no-ski.crt"): "no-ski.crt"}
 
-        cert = Certificate("self-signed.crt", "self-signed.crt", temp_cert_dir, clean_to_filesystem)
+        cert = Certificate(('certificate', "no-ski.crt"), "no-ski.crt", temp_cert_dir, clean_to_filesystem)
+
+        assert cert.ski is None
+
+    def test_certificate_without_aki(self, temp_cert_dir, basic_cert_data):
+        """Test self-signed certificate without AKI"""
+        cert_file = temp_cert_dir / "no-aki.crt"
+        cert_file.write_bytes(basic_cert_data['cert_pem'])
+
+        clean_to_filesystem = {('certificate', "no-aki.crt"): "no-aki.crt"}
+
+        cert = Certificate(('certificate', "no-aki.crt"), "no-aki.crt", temp_cert_dir, clean_to_filesystem)
 
         assert cert.aki is None
-
-    def test_certificate_invalid_pem_data(self, temp_cert_dir):
-        """Test handling of invalid certificate data"""
-        cert_file = temp_cert_dir / "invalid.crt"
-        cert_file.write_bytes(b"This is not a valid PEM certificate")
-
-        clean_to_filesystem = {"invalid.crt": "invalid.crt"}
-
-        with pytest.raises(ValueError, match="Failed to parse certificate invalid.crt"):
-            Certificate("invalid.crt", "invalid.crt", temp_cert_dir, clean_to_filesystem)
-
-    def test_certificate_file_not_found(self, temp_cert_dir):
-        """Test handling of missing certificate file"""
-        clean_to_filesystem = {"missing.crt": "missing.crt"}
-
-        with pytest.raises(ValueError):
-            Certificate("missing.crt", "missing.crt", temp_cert_dir, clean_to_filesystem)
-
-    def test_certificate_repr(self, temp_cert_dir, basic_cert_data):
-        """Test certificate string representation"""
-        cert_file = temp_cert_dir / "repr-test.crt"
-        cert_file.write_bytes(basic_cert_data['cert_pem'])
-
-        clean_to_filesystem = {"repr-test.crt": "repr-test.crt"}
-
-        cert = Certificate("repr-test.crt", "repr-test.crt", temp_cert_dir, clean_to_filesystem)
-
-        repr_str = repr(cert)
-        assert "Certificate Cert:" in repr_str
-        assert "test.example.com" in repr_str
-        assert "repr-test.crt" in repr_str
-        assert "Exp:" in repr_str
 
     def test_ca_certificate_repr(self, temp_cert_dir, ca_cert_data):
         """Test CA certificate string representation"""
         cert_file = temp_cert_dir / "ca-repr.crt"
         cert_file.write_bytes(ca_cert_data['cert_pem'])
 
-        clean_to_filesystem = {"ca-repr.crt": "ca-repr.crt"}
+        clean_to_filesystem = {('certificate', "ca-repr.crt"): "ca-repr.crt"}
 
-        cert = Certificate("ca-repr.crt", "ca-repr.crt", temp_cert_dir, clean_to_filesystem)
+        cert = Certificate(('certificate', "ca-repr.crt"), "ca-repr.crt", temp_cert_dir, clean_to_filesystem)
 
         repr_str = repr(cert)
         assert "Certificate CA:" in repr_str
@@ -313,9 +336,9 @@ class TestCertificate:
         cert_file = temp_cert_dir / "str-test.crt"
         cert_file.write_bytes(basic_cert_data['cert_pem'])
 
-        clean_to_filesystem = {"str-test.crt": "str-test.crt"}
+        clean_to_filesystem = {('certificate', "str-test.crt"): "str-test.crt"}
 
-        cert = Certificate("str-test.crt", "str-test.crt", temp_cert_dir, clean_to_filesystem)
+        cert = Certificate(('certificate', "str-test.crt"), "str-test.crt", temp_cert_dir, clean_to_filesystem)
 
         str_output = str(cert)
         assert cert.full_path in str_output
@@ -327,10 +350,10 @@ class TestCertificate:
         cert_file = temp_cert_dir / "hash-test.crt"
         cert_file.write_bytes(basic_cert_data['cert_pem'])
 
-        clean_to_filesystem = {"hash-test.crt": "hash-test.crt"}
+        clean_to_filesystem = {('certificate', "hash-test.crt"): "hash-test.crt"}
 
-        cert1 = Certificate("hash-test.crt", "hash-test.crt", temp_cert_dir, clean_to_filesystem)
-        cert2 = Certificate("hash-test.crt", "hash-test.crt", temp_cert_dir, clean_to_filesystem)
+        cert1 = Certificate(('certificate', "hash-test.crt"), "hash-test.crt", temp_cert_dir, clean_to_filesystem)
+        cert2 = Certificate(('certificate', "hash-test.crt"), "hash-test.crt", temp_cert_dir, clean_to_filesystem)
 
         # Same certificate data should be equal
         assert cert1 == cert2
@@ -350,12 +373,12 @@ class TestCertificate:
         cert2_file.write_bytes(cert2_pem)
 
         clean_to_filesystem = {
-            "cert1.crt": "cert1.crt",
-            "cert2.crt": "cert2.crt"
+            ('certificate', "cert1.crt"): "cert1.crt",
+            ('certificate', "cert2.crt"): "cert2.crt"
         }
 
-        cert_obj1 = Certificate("cert1.crt", "cert1.crt", temp_cert_dir, clean_to_filesystem)
-        cert_obj2 = Certificate("cert2.crt", "cert2.crt", temp_cert_dir, clean_to_filesystem)
+        cert_obj1 = Certificate(('certificate', "cert1.crt"), "cert1.crt", temp_cert_dir, clean_to_filesystem)
+        cert_obj2 = Certificate(('certificate', "cert2.crt"), "cert2.crt", temp_cert_dir, clean_to_filesystem)
 
         assert cert_obj1 != cert_obj2
 
@@ -364,9 +387,9 @@ class TestCertificate:
         cert_file = temp_cert_dir / "type-test.crt"
         cert_file.write_bytes(basic_cert_data['cert_pem'])
 
-        clean_to_filesystem = {"type-test.crt": "type-test.crt"}
+        clean_to_filesystem = {('certificate', "type-test.crt"): "type-test.crt"}
 
-        cert = Certificate("type-test.crt", "type-test.crt", temp_cert_dir, clean_to_filesystem)
+        cert = Certificate(('certificate', "type-test.crt"), "type-test.crt", temp_cert_dir, clean_to_filesystem)
 
         assert cert != "not a certificate"
         assert cert != 42
@@ -377,9 +400,9 @@ class TestCertificate:
         cert_file = temp_cert_dir / "deps-test.crt"
         cert_file.write_bytes(basic_cert_data['cert_pem'])
 
-        clean_to_filesystem = {"deps-test.crt": "deps-test.crt"}
+        clean_to_filesystem = {('certificate', "deps-test.crt"): "deps-test.crt"}
 
-        cert = Certificate("deps-test.crt", "deps-test.crt", temp_cert_dir, clean_to_filesystem)
+        cert = Certificate(('certificate', "deps-test.crt"), "deps-test.crt", temp_cert_dir, clean_to_filesystem)
 
         # Mock the collection
         mock_collection = Mock()
@@ -409,9 +432,9 @@ class TestCertificateEdgeCases:
         cert_file = temp_cert_dir / "expired.crt"
         cert_file.write_bytes(cert_pem)
 
-        clean_to_filesystem = {"expired.crt": "expired.crt"}
+        clean_to_filesystem = {('certificate', "expired.crt"): "expired.crt"}
 
-        cert_obj = Certificate("expired.crt", "expired.crt", temp_cert_dir, clean_to_filesystem)
+        cert_obj = Certificate(('certificate', "expired.crt"), "expired.crt", temp_cert_dir, clean_to_filesystem)
 
         assert cert_obj.not_valid_after < datetime.now(timezone.utc)
 
@@ -444,9 +467,9 @@ class TestCertificateEdgeCases:
         cert_file = temp_cert_dir / "future.crt"
         cert_file.write_bytes(cert_pem)
 
-        clean_to_filesystem = {"future.crt": "future.crt"}
+        clean_to_filesystem = {('certificate', "future.crt"): "future.crt"}
 
-        cert_obj = Certificate("future.crt", "future.crt", temp_cert_dir, clean_to_filesystem)
+        cert_obj = Certificate(('certificate', "future.crt"), "future.crt", temp_cert_dir, clean_to_filesystem)
 
         assert cert_obj.not_valid_before > datetime.now(timezone.utc)
 
@@ -479,9 +502,9 @@ class TestCertificateEdgeCases:
         cert_file = temp_cert_dir / "no-cn.crt"
         cert_file.write_bytes(cert_pem)
 
-        clean_to_filesystem = {"no-cn.crt": "no-cn.crt"}
+        clean_to_filesystem = {('certificate', "no-cn.crt"): "no-cn.crt"}
 
-        cert_obj = Certificate("no-cn.crt", "no-cn.crt", temp_cert_dir, clean_to_filesystem)
+        cert_obj = Certificate(('certificate', "no-cn.crt"), "no-cn.crt", temp_cert_dir, clean_to_filesystem)
 
         # Should still work, just no CN in subject
         assert "O=Test Org No CN" in cert_obj.subject

@@ -87,12 +87,12 @@ class TestCertificatePEMLoadingAndKeyVerification:
         key_file.write_bytes(rsa_cert_and_key_data['key_pem'])
 
         clean_to_filesystem = {
-            "/Common/test.example.com.crt": "test.example.com.crt",
-            "/Common/test.example.com.key": "test.example.com.key"
+            ('certificate', "/Common/test.example.com.crt"): "test.example.com.crt",
+            ('key', "/Common/test.example.com.key"): "test.example.com.key"
         }
 
         cert = Certificate(
-            "/Common/test.example.com.crt",
+            ('certificate', "/Common/test.example.com.crt"),
             "test.example.com.crt",
             temp_cert_dir,
             clean_to_filesystem,
@@ -120,12 +120,12 @@ class TestCertificatePEMLoadingAndKeyVerification:
         key_file.write_bytes(rsa_cert_and_key_data['key_pem'])
 
         clean_to_filesystem = {
-            "/Common/test.example.com.crt": "test.example.com.crt",
-            "/Common/test.example.com.key": "test.example.com.key"
+            ('certificate', "/Common/test.example.com.crt"): "test.example.com.crt",
+            ('key', "/Common/test.example.com.crt"): "test.example.com.key"
         }
 
         cert = Certificate(
-            "/Common/test.example.com.crt",
+            ('certificate', "/Common/test.example.com.crt"),
             "test.example.com.crt",
             temp_cert_dir,
             clean_to_filesystem,
@@ -143,11 +143,11 @@ class TestCertificatePEMLoadingAndKeyVerification:
         cert_file.write_bytes(rsa_cert_and_key_data['cert_pem'])
 
         clean_to_filesystem = {
-            "/Common/ca.crt": "ca.crt"
+            ('certificate', "/Common/ca.crt"): "ca.crt"
         }
 
         cert = Certificate(
-            "/Common/ca.crt",
+            ('certificate', "/Common/ca.crt"),
             "ca.crt",
             temp_cert_dir,
             clean_to_filesystem,
@@ -168,12 +168,12 @@ class TestCertificatePEMLoadingAndKeyVerification:
         key_file.write_bytes(rsa_cert_and_key_data['key_pem'])
 
         clean_to_filesystem = {
-            "/Common/test.example.com.crt": "test.example.com.crt",
-            "/Common/test.example.com.key": "test.example.com.key"
+            ('certificate', "/Common/test.example.com.crt"): "test.example.com.crt",
+            ('key', "/Common/test.example.com.key"): "test.example.com.key"
         }
 
         cert = Certificate(
-            "/Common/test.example.com.crt",
+            ('certificate', "/Common/test.example.com.crt"),
             "test.example.com.crt",
             temp_cert_dir,
             clean_to_filesystem,
@@ -192,12 +192,12 @@ class TestCertificatePEMLoadingAndKeyVerification:
         key_file.write_bytes(mismatched_key_data)
 
         clean_to_filesystem = {
-            "/Common/test.example.com.crt": "test.example.com.crt",
-            "/Common/test.example.com.key": "test.example.com.key"
+            ('certificate', "/Common/test.example.com.crt"): "test.example.com.crt",
+            ('key', "/Common/test.example.com.key"): "test.example.com.key"
         }
 
         cert = Certificate(
-            "/Common/test.example.com.crt",
+            ('certificate', "/Common/test.example.com.crt"),
             "test.example.com.crt",
             temp_cert_dir,
             clean_to_filesystem,
@@ -207,101 +207,19 @@ class TestCertificatePEMLoadingAndKeyVerification:
         # Verify key match returns False
         assert cert.verify_key_match() is False
 
-    def test_verify_key_match_ca_certificate(self, temp_cert_dir, rsa_cert_and_key_data):
-        """Test that verify_key_match returns False for CA certificates"""
-        # Create a CA certificate
-        private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-
-        subject = x509.Name([
-            x509.NameAttribute(NameOID.COUNTRY_NAME, "AU"),
-            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Test CA"),
-            x509.NameAttribute(NameOID.COMMON_NAME, "Test CA Root"),
-        ])
-
-        ca_cert = x509.CertificateBuilder().subject_name(
-            subject
-        ).issuer_name(
-            subject
-        ).public_key(
-            private_key.public_key()
-        ).serial_number(
-            54321
-        ).not_valid_before(
-            datetime(2024, 1, 1, tzinfo=timezone.utc)
-        ).not_valid_after(
-            datetime(2034, 1, 1, tzinfo=timezone.utc)
-        ).add_extension(
-            x509.BasicConstraints(ca=True, path_length=None),
-            critical=True,
-        ).sign(private_key, hashes.SHA256())
-
-        cert_pem = ca_cert.public_bytes(serialization.Encoding.PEM)
-        key_pem = private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption()
-        )
-
-        # Write CA certificate and key files
-        cert_file = temp_cert_dir / "ca.crt"
-        key_file = temp_cert_dir / "ca.key"
-        cert_file.write_bytes(cert_pem)
-        key_file.write_bytes(key_pem)
-
-        clean_to_filesystem = {
-            "/Common/ca.crt": "ca.crt",
-            "/Common/ca.key": "ca.key"
-        }
-
-        cert = Certificate(
-            "/Common/ca.crt",
-            "ca.crt",
-            temp_cert_dir,
-            clean_to_filesystem,
-            load_pem_data=True
-        )
-
-        # Verify CA certificates return False without raising
-        assert cert.verify_key_match() is False
-
-    def test_verify_key_match_no_pem_data_loaded(self, temp_cert_dir, rsa_cert_and_key_data):
-        """Test that verify_key_match raises ValueError when PEM data not loaded"""
-        # Write certificate and key files
-        cert_file = temp_cert_dir / "test.example.com.crt"
-        key_file = temp_cert_dir / "test.example.com.key"
-        cert_file.write_bytes(rsa_cert_and_key_data['cert_pem'])
-        key_file.write_bytes(rsa_cert_and_key_data['key_pem'])
-
-        clean_to_filesystem = {
-            "/Common/test.example.com.crt": "test.example.com.crt",
-            "/Common/test.example.com.key": "test.example.com.key"
-        }
-
-        cert = Certificate(
-            "/Common/test.example.com.crt",
-            "test.example.com.crt",
-            temp_cert_dir,
-            clean_to_filesystem,
-            load_pem_data=False  # Don't load PEM data
-        )
-
-        # Verify ValueError is raised when PEM data not loaded
-        with pytest.raises(ValueError, match="Certificate PEM data not loaded"):
-            cert.verify_key_match()
-
-    def test_verify_key_match_no_key_available(self, temp_cert_dir, rsa_cert_and_key_data):
-        """Test that verify_key_match raises ValueError when no key available"""
-        # Write only certificate file (no key)
-        cert_file = temp_cert_dir / "cert_only.crt"
+    def test_verify_key_match_no_key(self, temp_cert_dir, rsa_cert_and_key_data):
+        """Test key verification when no key file exists"""
+        # Write only certificate file
+        cert_file = temp_cert_dir / "standalone.crt"
         cert_file.write_bytes(rsa_cert_and_key_data['cert_pem'])
 
         clean_to_filesystem = {
-            "/Common/cert_only.crt": "cert_only.crt"
+            ('certificate', "/Common/standalone.crt"): "standalone.crt"
         }
 
         cert = Certificate(
-            "/Common/cert_only.crt",
-            "cert_only.crt",
+            ('certificate', "/Common/standalone.crt"),
+            "standalone.crt",
             temp_cert_dir,
             clean_to_filesystem,
             load_pem_data=True
@@ -311,8 +229,88 @@ class TestCertificatePEMLoadingAndKeyVerification:
         with pytest.raises(ValueError, match="Key PEM data not available"):
             cert.verify_key_match()
 
-    def test_load_pem_data_key_read_failure(self, temp_cert_dir, rsa_cert_and_key_data):
-        """Test handling of key file read errors when loading PEM data"""
+    def test_verify_key_match_pem_not_loaded(self, temp_cert_dir, rsa_cert_and_key_data):
+        """Test key verification raises error when PEM data not loaded"""
+        # Write certificate and key files
+        cert_file = temp_cert_dir / "test.example.com.crt"
+        key_file = temp_cert_dir / "test.example.com.key"
+        cert_file.write_bytes(rsa_cert_and_key_data['cert_pem'])
+        key_file.write_bytes(rsa_cert_and_key_data['key_pem'])
+
+        clean_to_filesystem = {
+            ('certificate', "/Common/test.example.com.crt"): "test.example.com.crt",
+            ('key', "/Common/test.example.com.crt"): "test.example.com.key"
+        }
+
+        cert = Certificate(
+            ('certificate', "/Common/test.example.com.crt"),
+            "test.example.com.crt",
+            temp_cert_dir,
+            clean_to_filesystem,
+            load_pem_data=False
+        )
+
+        # Verify raises error when PEM data not loaded
+        with pytest.raises(ValueError, match="Certificate PEM data not loaded"):
+            cert.verify_key_match()
+
+    def test_verify_key_match_ca_certificate(self, temp_cert_dir):
+        """Test key verification returns False for CA certificates"""
+        # Create a CA certificate
+        private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+        subject = x509.Name([
+            x509.NameAttribute(NameOID.COMMON_NAME, "Test CA"),
+        ])
+
+        cert = x509.CertificateBuilder().subject_name(
+            subject
+        ).issuer_name(
+            subject
+        ).public_key(
+            private_key.public_key()
+        ).serial_number(
+            12345
+        ).not_valid_before(
+            datetime(2024, 1, 1, tzinfo=timezone.utc)
+        ).not_valid_after(
+            datetime(2025, 1, 1, tzinfo=timezone.utc)
+        ).add_extension(
+            x509.BasicConstraints(ca=True, path_length=None),
+            critical=True,
+        ).sign(private_key, hashes.SHA256())
+
+        cert_pem = cert.public_bytes(serialization.Encoding.PEM)
+        key_pem = private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption()
+        )
+
+        # Write certificate and key files
+        cert_file = temp_cert_dir / "ca.crt"
+        key_file = temp_cert_dir / "ca.key"
+        cert_file.write_bytes(cert_pem)
+        key_file.write_bytes(key_pem)
+
+        clean_to_filesystem = {
+            ('certificate', "/Common/ca.crt"): "ca.crt",
+            ('key', "/Common/ca.crt"): "ca.key"
+        }
+
+        ca_cert = Certificate(
+            ('certificate', "/Common/ca.crt"),
+            "ca.crt",
+            temp_cert_dir,
+            clean_to_filesystem,
+            load_pem_data=True
+        )
+
+        # CA certificates should return False, not raise an exception
+        assert ca_cert.verify_key_match() is False
+
+    def test_key_pem_loading_error_handling(self, temp_cert_dir, rsa_cert_and_key_data):
+        """Test graceful error handling when key PEM data fails to load"""
         # Write certificate file
         cert_file = temp_cert_dir / "test.example.com.crt"
         cert_file.write_bytes(rsa_cert_and_key_data['cert_pem'])
@@ -322,14 +320,14 @@ class TestCertificatePEMLoadingAndKeyVerification:
         key_file.write_bytes(b'\xff\xfe\x00\x01')  # Invalid UTF-8 bytes
 
         clean_to_filesystem = {
-            "/Common/test.example.com.crt": "test.example.com.crt",
-            "/Common/test.example.com.key": "test.example.com.key"
+            ('certificate', "/Common/test.example.com.crt"): "test.example.com.crt",
+            ('key', "/Common/test.example.com.key"): "test.example.com.key"
         }
 
         # Mock the print function to capture warning message
         with patch('builtins.print') as mock_print:
             cert = Certificate(
-                "/Common/test.example.com.crt",
+                ('certificate', "/Common/test.example.com.crt"),
                 "test.example.com.crt",
                 temp_cert_dir,
                 clean_to_filesystem,
@@ -352,13 +350,13 @@ class TestCertificatePEMLoadingAndKeyVerification:
         key_file.write_bytes(rsa_cert_and_key_data['key_pem'])
 
         clean_to_filesystem = {
-            "/Common/test.example.com.crt": "test.example.com.crt",
-            "/Common/test.example.com.key": "test.example.com.key"
+            ('certificate', "/Common/test.example.com.crt"): "test.example.com.crt",
+            ('key', "/Common/test.example.com.crt"): "test.example.com.key"
         }
 
         # Test with PEM data loaded
         cert_with_pem = Certificate(
-            "/Common/test.example.com.crt",
+            ('certificate', "/Common/test.example.com.crt"),
             "test.example.com.crt",
             temp_cert_dir,
             clean_to_filesystem,
@@ -370,7 +368,7 @@ class TestCertificatePEMLoadingAndKeyVerification:
 
         # Test without PEM data loaded
         cert_without_pem = Certificate(
-            "/Common/test.example.com.crt",
+            ('certificate', "/Common/test.example.com.crt"),
             "test.example.com.crt",
             temp_cert_dir,
             clean_to_filesystem,

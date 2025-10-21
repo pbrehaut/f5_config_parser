@@ -39,8 +39,13 @@ def extract_tar(tar_path: str) -> Path:
     return extract_dir
 
 
-def parse_f5_filename(filesystem_filename: str) -> str:
-    """Convert filesystem filename to clean F5 name"""
+def parse_f5_filename(filesystem_filename: str) -> tuple[str, str]:
+    """
+    Convert filesystem filename to (file_type, clean_f5_name) tuple
+
+    Returns:
+        tuple: (file_type, clean_f5_name) where file_type is 'certificate', 'key', etc.
+    """
     # Remove version suffix like _93973_1
     pattern = r'^(.+)_\d+_\d+$'
     match = re.match(pattern, filesystem_filename)
@@ -56,6 +61,19 @@ def parse_f5_filename(filesystem_filename: str) -> str:
     # Extract F5 path from structure like: files_d/Common_d/certificate_d/:Common:filename
     parts = clean_name.replace('\\', '/').split('/')
 
+    # Find the directory type (certificate_d, certificate_key_d, etc.)
+    file_type = None
+    for part in parts:
+        if part == 'certificate_d':
+            file_type = 'certificate'
+            break
+        elif part == 'certificate_key_d':
+            file_type = 'key'
+            break
+
+    if not file_type:
+        raise ValueError(f"No recognised file type directory found in: {filesystem_filename}")
+
     # Find the F5 name part (contains colons)
     f5_part = None
     for part in parts:
@@ -69,11 +87,16 @@ def parse_f5_filename(filesystem_filename: str) -> str:
     # Convert :Common:filename to /Common/filename
     clean_f5_name = f5_part.replace(':', '/')
 
-    return clean_f5_name
+    return (file_type, clean_f5_name)
 
 
 def build_filename_mappings(extract_dir: Path) -> tuple[dict, dict]:
-    """Build mappings between filesystem and clean filenames"""
+    """
+    Build mappings between filesystem and clean filenames using tuple keys
+
+    Returns:
+        tuple: (filesystem_to_clean, clean_to_filesystem) where keys are (file_type, name) tuples
+    """
     filesystem_to_clean = {}
     clean_to_filesystem = {}
 
@@ -82,9 +105,11 @@ def build_filename_mappings(extract_dir: Path) -> tuple[dict, dict]:
             filesystem_filename = str(file_path.relative_to(extract_dir))
 
             try:
-                clean_filename = parse_f5_filename(filesystem_filename)
-                filesystem_to_clean[filesystem_filename] = clean_filename
-                clean_to_filesystem[clean_filename] = filesystem_filename
+                file_type, clean_f5_name = parse_f5_filename(filesystem_filename)
+                tuple_key = (file_type, clean_f5_name)
+
+                filesystem_to_clean[filesystem_filename] = tuple_key
+                clean_to_filesystem[tuple_key] = filesystem_filename
 
             except ValueError as e:
                 print(f"Skipping unparseable file: {e}")
@@ -112,23 +137,23 @@ def load_certificates_from_tar(tar_file_path: str, load_pem_data: bool = False) 
         # Build filename mappings
         filesystem_to_clean, clean_to_filesystem = build_filename_mappings(extract_dir)
 
-        # Find all certificate files (include .crt, .key, .pem)
-        cert_files = [clean_name for clean_name in clean_to_filesystem.keys()
-                      if clean_name.endswith(('.crt', '.key', '.pem'))]
+        # Find all certificate files (filter by file_type)
+        cert_tuples = [tuple_key for tuple_key in clean_to_filesystem.keys()
+                       if tuple_key[0] == 'certificate']
 
-        print(f"Found {len(cert_files)} certificate files")
+        print(f"Found {len(cert_tuples)} certificate files")
 
         # Load each certificate
         certificates = []
-        for clean_filename in cert_files:
-            filesystem_filename = clean_to_filesystem[clean_filename]
+        for cert_tuple in cert_tuples:
+            filesystem_filename = clean_to_filesystem[cert_tuple]
 
             try:
-                cert = Certificate(clean_filename, filesystem_filename, extract_dir,
-                                 clean_to_filesystem, load_pem_data=load_pem_data)
+                cert = Certificate(cert_tuple, filesystem_filename, extract_dir,
+                                   clean_to_filesystem, load_pem_data=load_pem_data)
                 certificates.append(cert)
             except ValueError as e:
-                print(f"Failed to load certificate {clean_filename}: {e}")
+                print(f"Failed to load certificate {cert_tuple}: {e}")
 
         print(f"Loaded {len(certificates)} certificates")
         return certificates

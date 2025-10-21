@@ -14,42 +14,42 @@ class TestParseF5Filename:
     def test_parse_standard_certificate_filename(self):
         """Test parsing a standard certificate filename"""
         filesystem_filename = "files_d/Common_d/certificate_d/_COLON_Common_COLON_mycert.crt_93973_1"
-        expected = "/Common/mycert.crt"
+        expected = ('certificate', "/Common/mycert.crt")
         result = parse_f5_filename(filesystem_filename)
         assert result == expected
 
     def test_parse_standard_key_filename(self):
         """Test parsing a standard key filename"""
-        filesystem_filename = "files_d/Common_d/key_d/_COLON_Common_COLON_mykey.key_12345_2"
-        expected = "/Common/mykey.key"
+        filesystem_filename = "files_d/Common_d/certificate_key_d/_COLON_Common_COLON_mykey.key_12345_2"
+        expected = ('key', "/Common/mykey.key")
         result = parse_f5_filename(filesystem_filename)
         assert result == expected
 
     def test_parse_different_partition(self):
         """Test parsing filename from different partition"""
         filesystem_filename = "files_d/MyPartition_d/certificate_d/_COLON_MyPartition_COLON_cert.crt_55555_3"
-        expected = "/MyPartition/cert.crt"
+        expected = ('certificate', "/MyPartition/cert.crt")
         result = parse_f5_filename(filesystem_filename)
         assert result == expected
 
     def test_parse_complex_certificate_name(self):
         """Test parsing certificate with complex name including hyphens and dots"""
         filesystem_filename = "files_d/Common_d/certificate_d/_COLON_Common_COLON_my-complex.cert.name.crt_11111_1"
-        expected = "/Common/my-complex.cert.name.crt"
+        expected = ('certificate', "/Common/my-complex.cert.name.crt")
         result = parse_f5_filename(filesystem_filename)
         assert result == expected
 
     def test_parse_windows_path_separators(self):
         """Test parsing with Windows path separators"""
         filesystem_filename = r"files_d\Common_d\certificate_d\_COLON_Common_COLON_mycert.crt_93973_1"
-        expected = "/Common/mycert.crt"
+        expected = ('certificate', "/Common/mycert.crt")
         result = parse_f5_filename(filesystem_filename)
         assert result == expected
 
     def test_parse_multiple_colons_in_name(self):
         """Test parsing filename that originally had multiple colons"""
         filesystem_filename = "files_d/Common_d/certificate_d/_COLON_Common_COLON_my_COLON_cert_COLON_name.crt_77777_4"
-        expected = "/Common/my/cert/name.crt"
+        expected = ('certificate', "/Common/my/cert/name.crt")
         result = parse_f5_filename(filesystem_filename)
         assert result == expected
 
@@ -68,7 +68,7 @@ class TestParseF5Filename:
     def test_invalid_filename_no_f5_path(self):
         """Test error handling for filename without F5 path (no colons)"""
         filesystem_filename = "some_random_file_12345_1"
-        with pytest.raises(ValueError, match="No F5 path found"):
+        with pytest.raises(ValueError, match=f"No recognised file type directory found in: {filesystem_filename}"):
             parse_f5_filename(filesystem_filename)
 
     def test_invalid_filename_empty_string(self):
@@ -79,7 +79,7 @@ class TestParseF5Filename:
     def test_edge_case_single_character_names(self):
         """Test parsing with single character certificate name"""
         filesystem_filename = "files_d/Common_d/certificate_d/_COLON_Common_COLON_x.crt_99999_9"
-        expected = "/Common/x.crt"
+        expected = ('certificate', "/Common/x.crt")
         result = parse_f5_filename(filesystem_filename)
         assert result == expected
 
@@ -95,7 +95,7 @@ class TestBuildFilenameMappings:
         test_files = [
             "files_d/Common_d/certificate_d/_COLON_Common_COLON_cert1.crt_12345_1",
             "files_d/Common_d/certificate_d/_COLON_Common_COLON_cert2.crt_67890_2",
-            "files_d/Common_d/key_d/_COLON_Common_COLON_cert1.key_12345_1",
+            "files_d/Common_d/certificate_key_d/_COLON_Common_COLON_cert1.key_12345_1",
             "files_d/MyPartition_d/certificate_d/_COLON_MyPartition_COLON_cert3.crt_11111_1",
             "some_random_file.txt",  # This should be skipped
             "another_unparseable_file_without_proper_format"  # This should be skipped
@@ -117,33 +117,35 @@ class TestBuildFilenameMappings:
 
         # Should have mappings for parseable files only
         expected_clean_files = {
-            "/Common/cert1.crt",
-            "/Common/cert2.crt",
-            "/Common/cert1.key",
-            "/MyPartition/cert3.crt"
+            ('certificate', "/Common/cert1.crt"),
+            ('certificate', "/Common/cert2.crt"),
+            ('key', "/Common/cert1.key"),
+            ('certificate', "/MyPartition/cert3.crt")
         }
 
         assert set(clean_to_filesystem.keys()) == expected_clean_files
-        assert len(filesystem_to_clean) == 4
         assert len(clean_to_filesystem) == 4
 
-    def test_build_mappings_bidirectional(self):
-        """Test that mappings are properly bidirectional"""
+    def test_build_mappings_certificate_and_key_pairing(self):
+        """Test that certificates and keys are properly paired with tuple keys"""
         filesystem_to_clean, clean_to_filesystem = build_filename_mappings(self.temp_dir)
 
-        # Test bidirectional mapping
-        for filesystem_name, clean_name in filesystem_to_clean.items():
-            assert clean_to_filesystem[clean_name] == filesystem_name
+        # Check certificate mapping
+        cert1_tuple = ('certificate', "/Common/cert1.crt")
+        assert cert1_tuple in clean_to_filesystem
+        assert "cert1.crt" in clean_to_filesystem[cert1_tuple]
 
-        for clean_name, filesystem_name in clean_to_filesystem.items():
-            assert filesystem_to_clean[filesystem_name] == clean_name
+        # Check key mapping - key uses the certificate filename as the clean name
+        key1_tuple = ('key', "/Common/cert1.key")
+        assert key1_tuple in clean_to_filesystem
+        assert "cert1.key" in clean_to_filesystem[key1_tuple]
 
     def test_build_mappings_skips_unparseable_files(self):
         """Test that unparseable files are skipped without causing errors"""
         filesystem_to_clean, clean_to_filesystem = build_filename_mappings(self.temp_dir)
 
         # Unparseable files should not be in mappings
-        all_filesystem_files = set(filesystem_to_clean.keys())
+        all_filesystem_files = set(clean_to_filesystem.values())
 
         assert "some_random_file.txt" not in all_filesystem_files
         assert "another_unparseable_file_without_proper_format" not in all_filesystem_files
@@ -153,7 +155,6 @@ class TestBuildFilenameMappings:
         empty_dir = Path(tempfile.mkdtemp())
         try:
             filesystem_to_clean, clean_to_filesystem = build_filename_mappings(empty_dir)
-            assert len(filesystem_to_clean) == 0
             assert len(clean_to_filesystem) == 0
         finally:
             shutil.rmtree(empty_dir)
@@ -167,18 +168,33 @@ class TestBuildFilenameMappings:
             (dirs_only / "another_dir").mkdir()
 
             filesystem_to_clean, clean_to_filesystem = build_filename_mappings(dirs_only)
-            assert len(filesystem_to_clean) == 0
             assert len(clean_to_filesystem) == 0
         finally:
             shutil.rmtree(dirs_only)
 
+    def test_build_mappings_tuple_key_structure(self):
+        """Test that all keys are tuples with correct structure"""
+        filesystem_to_clean, clean_to_filesystem = build_filename_mappings(self.temp_dir)
 
-# Test data for parametrized tests
+        for key, value in clean_to_filesystem.items():
+            # All keys should be tuples
+            assert isinstance(key, tuple)
+            # All tuples should have exactly 2 elements
+            assert len(key) == 2
+            # First element should be 'certificate' or 'key'
+            assert key[0] in ('certificate', 'key')
+            # Second element should be a string (the clean filename)
+            assert isinstance(key[1], str)
+            # Value should be a string (the filesystem filename)
+            assert isinstance(value, str)
+
+
+# Test data for parametrised tests
 VALID_FILENAME_CASES = [
-    ("files_d/Common_d/certificate_d/_COLON_Common_COLON_test.crt_12345_1", "/Common/test.crt"),
-    ("files_d/Prod_d/key_d/_COLON_Prod_COLON_prod-key.key_99999_5", "/Prod/prod-key.key"),
+    ("files_d/Common_d/certificate_d/_COLON_Common_COLON_test.crt_12345_1", ('certificate', "/Common/test.crt")),
+    ("files_d/Prod_d/certificate_key_d/_COLON_Prod_COLON_prod-key.key_99999_5", ('key', "/Prod/prod-key.key")),
     ("files_d/Test_d/certificate_d/_COLON_Test_COLON_my_COLON_complex_COLON_name.crt_55555_3",
-     "/Test/my/complex/name.crt"),
+     ('certificate', "/Test/my/complex/name.crt")),
 ]
 
 INVALID_FILENAME_CASES = [
@@ -191,7 +207,7 @@ INVALID_FILENAME_CASES = [
 
 
 class TestParseF5FilenameParametrized:
-    """Parametrized tests for parse_f5_filename function"""
+    """Parametrised tests for parse_f5_filename function"""
 
     @pytest.mark.parametrize("filesystem_filename,expected", VALID_FILENAME_CASES)
     def test_valid_filenames(self, filesystem_filename, expected):
