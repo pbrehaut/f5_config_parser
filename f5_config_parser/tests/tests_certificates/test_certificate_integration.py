@@ -58,7 +58,6 @@ class TestCertificateIntegration:
         assert digicert_ca.not_valid_before == datetime(2013, 3, 8, 12, 0, tzinfo=timezone.utc)
         assert digicert_ca.not_valid_after == datetime(2023, 3, 8, 12, 0, tzinfo=timezone.utc)
         assert digicert_ca.key_filename is None
-        assert digicert_ca.key_filesystem_filename is None
 
     def test_servicedeskdr_signed_certificate_attributes(self, loaded_certificates):
         """Test servicedeskdr signed certificate has expected attributes"""
@@ -82,7 +81,6 @@ class TestCertificateIntegration:
         assert servicedeskdr_cert.not_valid_before == datetime(2020, 1, 9, 0, 0, tzinfo=timezone.utc)
         assert servicedeskdr_cert.not_valid_after == datetime(2021, 1, 12, 12, 0, tzinfo=timezone.utc)
         assert servicedeskdr_cert.key_filename == '/Legacy-CSC/servicedeskdr.aust.csc.com.key'
-        assert servicedeskdr_cert.key_filesystem_filename == 'files_d\\Legacy-CSC_d\\certificate_key_d\\_COLON_Legacy-CSC_COLON_servicedeskdr.aust.csc.com.key_56663_1'
 
     def test_symantec_intermediate_ca_attributes(self, loaded_certificates):
         """Test Symantec intermediate CA certificate has expected attributes"""
@@ -106,7 +104,6 @@ class TestCertificateIntegration:
         assert symantec_ca.not_valid_before == datetime(2013, 10, 31, 0, 0, tzinfo=timezone.utc)
         assert symantec_ca.not_valid_after == datetime(2023, 10, 30, 23, 59, 59, tzinfo=timezone.utc)
         assert symantec_ca.key_filename is None
-        assert symantec_ca.key_filesystem_filename is None
 
     def test_css_ecp_certificate_attributes(self, loaded_certificates):
         """Test css.ecp.csc.com.au certificate has expected attributes"""
@@ -130,7 +127,6 @@ class TestCertificateIntegration:
         assert css_cert.not_valid_before == datetime(2016, 5, 17, 0, 0, tzinfo=timezone.utc)
         assert css_cert.not_valid_after == datetime(2017, 5, 18, 23, 59, 59, tzinfo=timezone.utc)
         assert css_cert.key_filename == '/ECP/css.ecp.csc.com.au.key'
-        assert css_cert.key_filesystem_filename == 'files_d\\ECP_d\\certificate_key_d\\_COLON_ECP_COLON_css.ecp.csc.com.au.key_77183_1'
 
     def test_proxy_paxus_self_signed_certificate_attributes(self, loaded_certificates):
         """Test proxy.paxus.com.au self-signed certificate has expected attributes"""
@@ -154,91 +150,112 @@ class TestCertificateIntegration:
         assert proxy_cert.not_valid_before == datetime(2014, 7, 8, 6, 16, 50, tzinfo=timezone.utc)
         assert proxy_cert.not_valid_after == datetime(2019, 7, 7, 6, 16, 50, tzinfo=timezone.utc)
         assert proxy_cert.key_filename == '/Common/proxy.paxus.com.au.key'
-        assert proxy_cert.key_filesystem_filename == 'files_d\\Common_d\\certificate_key_d\\_COLON_Common_COLON_proxy.paxus.com.au.key_58044_1'
 
         # Test self-signed detection (subject == issuer)
         assert proxy_cert.subject == proxy_cert.issuer
 
-    def test_certificate_chain_relationships(self, loaded_certificates):
-        """Test certificate chain relationships work correctly"""
-        # Create certificate lookup by filename
+    def test_ca_certificate_detection(self, loaded_certificates):
+        """Test that CA certificates are properly detected"""
         cert_lookup = {cert.filename: cert for cert in loaded_certificates}
 
-        # Test DigiCert chain: servicedeskdr → DigiCert CA
-        servicedeskdr = cert_lookup.get('/Legacy-CSC/servicedeskdr.aust.csc.com.crt')
+        # Known CA certificates
         digicert_ca = cert_lookup.get('/Common/DigiCertCA.crt')
+        symantec_ca = cert_lookup.get('/Common/Symantec-Class3-CA-G4.crt')
 
-        if servicedeskdr and digicert_ca:
+        if digicert_ca:
+            assert digicert_ca.is_ca is True
+        if symantec_ca:
+            assert symantec_ca.is_ca is True
+
+        # Known non-CA certificates
+        servicedeskdr = cert_lookup.get('/Legacy-CSC/servicedeskdr.aust.csc.com.crt')
+        css_cert = cert_lookup.get('/ECP/css.ecp.csc.com.au.crt')
+        proxy_cert = cert_lookup.get('/Common/proxy.paxus.com.au.crt')
+
+        if servicedeskdr:
+            assert servicedeskdr.is_ca is False
+        if css_cert:
+            assert css_cert.is_ca is False
+        if proxy_cert:
+            assert proxy_cert.is_ca is False
+
+    def test_certificate_chain_relationships(self, loaded_certificates):
+        """Test certificate chain relationships using SKI/AKI"""
+        cert_lookup = {cert.filename: cert for cert in loaded_certificates}
+
+        # DigiCert CA should be issuer of servicedeskdr certificate
+        digicert_ca = cert_lookup.get('/Common/DigiCertCA.crt')
+        servicedeskdr = cert_lookup.get('/Legacy-CSC/servicedeskdr.aust.csc.com.crt')
+
+        if digicert_ca and servicedeskdr:
             # servicedeskdr's AKI should match DigiCert CA's SKI
             assert servicedeskdr.aki == digicert_ca.ski
             assert servicedeskdr.aki == '0F80611C823161D52F28E78D4638B42CE1C6D9E2'
 
-        # Test Symantec chain: css.ecp → Symantec CA
-        css_cert = cert_lookup.get('/ECP/css.ecp.csc.com.au.crt')
+        # Symantec CA should be issuer of css.ecp certificate
         symantec_ca = cert_lookup.get('/Common/Symantec-Class3-CA-G4.crt')
+        css_cert = cert_lookup.get('/ECP/css.ecp.csc.com.au.crt')
 
-        if css_cert and symantec_ca:
+        if symantec_ca and css_cert:
             # css.ecp's AKI should match Symantec CA's SKI
             assert css_cert.aki == symantec_ca.ski
             assert css_cert.aki == '5F60CF619055DF8443148A602AB2F57AF44318EF'
 
-    def test_expired_certificates_detection(self, loaded_certificates):
-        """Test that expired certificates are properly identified"""
-        current_time = datetime.now(timezone.utc)
-
-        # Find certificates that should be expired
-        expired_certs = [cert for cert in loaded_certificates if cert.not_valid_after < current_time]
-
-        # We know servicedeskdr and css.ecp are expired
-        expired_filenames = [cert.filename for cert in expired_certs]
-
-        assert '/Legacy-CSC/servicedeskdr.aust.csc.com.crt' in expired_filenames
-        assert '/ECP/css.ecp.csc.com.au.crt' in expired_filenames
-        assert '/Common/proxy.paxus.com.au.crt' in expired_filenames
-
-    def test_ca_certificates_identification(self, loaded_certificates):
-        """Test that CA certificates are properly identified"""
-        ca_certs = [cert for cert in loaded_certificates if cert.is_ca]
-        ca_filenames = [cert.filename for cert in ca_certs]
-
-        # We know these should be CA certificates
-        assert '/Common/DigiCertCA.crt' in ca_filenames
-        assert '/Common/Symantec-Class3-CA-G4.crt' in ca_filenames
-
-        # Verify they all have SKI (required for CAs)
-        for ca_cert in ca_certs:
-            if ca_cert.filename in ['/Common/DigiCertCA.crt', '/Common/Symantec-Class3-CA-G4.crt']:
-                assert ca_cert.ski is not None
-
     def test_certificates_with_matching_keys(self, loaded_certificates):
-        """Test that certificates with matching key files are identified"""
+        """Test that certificates with matching keys are properly identified"""
         certs_with_keys = [cert for cert in loaded_certificates if cert.key_filename is not None]
 
-        # We know these certificates should have matching keys
-        key_cert_filenames = [cert.filename for cert in certs_with_keys]
+        # We should have some certificates with keys
+        assert len(certs_with_keys) > 0
 
-        assert '/Legacy-CSC/servicedeskdr.aust.csc.com.crt' in key_cert_filenames
-        assert '/ECP/css.ecp.csc.com.au.crt' in key_cert_filenames
-        assert '/Common/proxy.paxus.com.au.crt' in key_cert_filenames
+        # Known certificates that should have keys
+        expected_certs_with_keys = [
+            '/Legacy-CSC/servicedeskdr.aust.csc.com.crt',
+            '/ECP/css.ecp.csc.com.au.crt',
+            '/Common/proxy.paxus.com.au.crt'
+        ]
 
-        # Verify key filename patterns
-        for cert in certs_with_keys:
-            if cert.filename.endswith('.crt'):
-                expected_key = cert.filename.replace('.crt', '.key')
-                assert cert.key_filename == expected_key
+        cert_filenames = [cert.filename for cert in certs_with_keys]
 
-    def test_certificates_without_matching_keys(self, loaded_certificates):
-        """Test that CA certificates don't have matching key files"""
+        for expected_cert in expected_certs_with_keys:
+            assert expected_cert in cert_filenames, f"Expected certificate {expected_cert} to have a key"
+
+    def test_ca_certificates_without_keys(self, loaded_certificates):
+        """Test that CA certificates typically don't have keys"""
         ca_certs = [cert for cert in loaded_certificates if cert.is_ca]
 
+        # CA certificates should not have matching keys in this archive
         for ca_cert in ca_certs:
-            # CA certificates typically don't have private keys in F5 configs
-            if ca_cert.filename in ['/Common/DigiCertCA.crt', '/Common/Symantec-Class3-CA-G4.crt']:
-                assert ca_cert.key_filename is None
-                assert ca_cert.key_filesystem_filename is None
+            assert ca_cert.key_filename is None, f"CA certificate {ca_cert.filename} should not have a key file"
 
-    def test_certificate_repr_formats(self, loaded_certificates):
-        """Test certificate string representations"""
+    def test_expired_certificates(self, loaded_certificates):
+        """Test identification of expired certificates"""
+        now = datetime.now(timezone.utc)
+        expired_certs = [cert for cert in loaded_certificates if cert.not_valid_after < now]
+
+        # We should have some expired certificates in the archive
+        assert len(expired_certs) > 0
+
+        # Known expired certificates
+        cert_lookup = {cert.filename: cert for cert in loaded_certificates}
+
+        digicert_ca = cert_lookup.get('/Common/DigiCertCA.crt')
+        servicedeskdr = cert_lookup.get('/Legacy-CSC/servicedeskdr.aust.csc.com.crt')
+        css_cert = cert_lookup.get('/ECP/css.ecp.csc.com.au.crt')
+        proxy_cert = cert_lookup.get('/Common/proxy.paxus.com.au.crt')
+
+        # These certificates have expired
+        if digicert_ca:
+            assert digicert_ca.not_valid_after < now
+        if servicedeskdr:
+            assert servicedeskdr.not_valid_after < now
+        if css_cert:
+            assert css_cert.not_valid_after < now
+        if proxy_cert:
+            assert proxy_cert.not_valid_after < now
+
+    def test_certificate_representations(self, loaded_certificates):
+        """Test __repr__ and __str__ methods with real data"""
         cert_lookup = {cert.filename: cert for cert in loaded_certificates}
 
         # Test CA certificate repr

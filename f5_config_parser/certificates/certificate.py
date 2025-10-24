@@ -15,50 +15,33 @@ if TYPE_CHECKING:
 class Certificate(ConfigStanza):
     """Represents an F5 certificate as a ConfigStanza for unified collection support"""
 
-    def __init__(self, cert_tuple: tuple[str, str], filesystem_filename: str,
-                 extract_dir: Path, clean_to_filesystem: dict, load_pem_data: bool = False):
+    def __init__(self, cert_filename: str, cert: x509.Certificate,
+                 cert_pem_data: Optional[str] = None,
+                 key_filename: Optional[str] = None,
+                 key_pem_data: Optional[str] = None):
         """
-        Create Certificate from file path and initialise as ConfigStanza
+        Create Certificate from parsed x509 certificate and initialise as ConfigStanza
 
         Args:
-            cert_tuple: Tuple of (file_type, clean_filename) e.g., ('certificate', '/Common/mycert')
-            filesystem_filename: Raw filesystem path in the extracted archive
-            extract_dir: Path to the extraction directory
-            clean_to_filesystem: Dictionary mapping tuple keys to filesystem filenames
-            load_pem_data: Whether to load the actual PEM data
+            cert_filename: Clean certificate filename e.g., '/Common/mycert.crt'
+            cert: Parsed x509.Certificate object
+            cert_pem_data: Optional PEM data for the certificate
+            key_filename: Optional clean filename for the matching key
+            key_pem_data: Optional PEM data for the matching key
         """
-        # Extract file type and clean filename from tuple
-        file_type, clean_filename = cert_tuple
-
         # Map certificate to ConfigStanza interface
-        prefix = ('certificate', 'object')  # Our chosen prefix for certificate objects
-        name = clean_filename  # Use clean filename as the stanza name
-        config_lines = []  # Certificates don't have traditional config lines
+        prefix = ('certificate', 'object')
+        name = cert_filename
+        config_lines = []
 
         # Initialise parent ConfigStanza first
         super().__init__(prefix=prefix, name=name, config_lines=config_lines)
 
-        # Now load certificate data
-        cert_path = extract_dir / filesystem_filename
-
-        try:
-            cert_data = cert_path.read_bytes()
-            cert = x509.load_pem_x509_certificate(cert_data, default_backend())
-        except ValueError as e:
-            raise ValueError(f"Failed to parse certificate {clean_filename}: {e}")
-        except FileNotFoundError as e:
-            raise ValueError(f"Failed to find file {clean_filename}: {e}")
-
         # Store basic info
-        self.filename = clean_filename
-        self.filesystem_filename = filesystem_filename
-
-        # Store PEM data if requested
-        self.pem_data: Optional[str] = None
-        self.key_pem_data: Optional[str] = None
-
-        if load_pem_data:
-            self.pem_data = cert_data.decode('utf-8')
+        self.filename = cert_filename
+        self.pem_data = cert_pem_data
+        self.key_filename = key_filename
+        self.key_pem_data = key_pem_data
 
         # Extract certificate metadata
         self.subject = cert.subject.rfc4514_string()
@@ -107,24 +90,6 @@ class Certificate(ConfigStanza):
             self.is_ca = basic_constraints.value.ca
         except x509.ExtensionNotFound:
             pass
-
-        # Determine matching key filename using tuple lookup
-        self.key_filename = None
-        self.key_filesystem_filename = None
-
-        # Look for matching key with same base name
-        key_tuple = ('key', clean_filename.replace('.crt', '.key'))
-        if key_tuple in clean_to_filesystem:
-            self.key_filename = clean_filename.replace('.crt', '.key')
-            self.key_filesystem_filename = clean_to_filesystem[key_tuple]
-
-            # Load key PEM data if requested
-            if load_pem_data:
-                key_path = extract_dir / self.key_filesystem_filename
-                try:
-                    self.key_pem_data = key_path.read_text(encoding='utf-8')
-                except (ValueError, IOError) as e:
-                    print(f"Warning: Failed to load key PEM data for {clean_filename}: {e}")
 
     @property
     def cert_id(self) -> str:
@@ -217,7 +182,6 @@ class Certificate(ConfigStanza):
         """
         return {
             'filename': self.filename,
-            'filesystem_filename': self.filesystem_filename,
             'subject': self.subject,
             'issuer': self.issuer,
             'serial_number': self.serial_number,
@@ -229,7 +193,6 @@ class Certificate(ConfigStanza):
             'ocsp_uri': self.ocsp_uri,
             'is_ca': self.is_ca,
             'key_filename': self.key_filename,
-            'key_filesystem_filename': self.key_filesystem_filename,
         }
 
     def verify_key_match(self) -> bool:

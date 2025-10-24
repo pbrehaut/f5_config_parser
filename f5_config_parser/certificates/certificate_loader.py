@@ -6,6 +6,8 @@ from pathlib import Path
 import re
 import shutil
 from typing import List
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
 from f5_config_parser.certificates.certificate import Certificate
 
 
@@ -137,7 +139,7 @@ def load_certificates_from_tar(tar_file_path: str, load_pem_data: bool = False) 
         # Build filename mappings
         filesystem_to_clean, clean_to_filesystem = build_filename_mappings(extract_dir)
 
-        # Find all certificate files (filter by file_type)
+        # Find all certificate files
         cert_tuples = [tuple_key for tuple_key in clean_to_filesystem.keys()
                        if tuple_key[0] == 'certificate']
 
@@ -146,14 +148,51 @@ def load_certificates_from_tar(tar_file_path: str, load_pem_data: bool = False) 
         # Load each certificate
         certificates = []
         for cert_tuple in cert_tuples:
-            filesystem_filename = clean_to_filesystem[cert_tuple]
+            file_type, cert_filename = cert_tuple
+            cert_filesystem_filename = clean_to_filesystem[cert_tuple]
 
+            # Look for matching key
+            key_tuple = ('key', cert_filename.replace('.crt', '.key'))
+            key_filename = None
+            key_pem_data = None
+
+            if key_tuple in clean_to_filesystem:
+                key_filename = cert_filename.replace('.crt', '.key')
+                key_filesystem_filename = clean_to_filesystem[key_tuple]
+
+                # Load key PEM data if requested
+                if load_pem_data:
+                    key_path = extract_dir / key_filesystem_filename
+                    try:
+                        key_pem_data = key_path.read_text(encoding='utf-8')
+                    except (ValueError, IOError) as e:
+                        print(f"Warning: Failed to load key PEM data for {cert_filename}: {e}")
+
+            # Load certificate from file
+            cert_path = extract_dir / cert_filesystem_filename
             try:
-                cert = Certificate(cert_tuple, filesystem_filename, extract_dir,
-                                   clean_to_filesystem, load_pem_data=load_pem_data)
-                certificates.append(cert)
+                cert_data = cert_path.read_bytes()
+                cert = x509.load_pem_x509_certificate(cert_data, default_backend())
+
+                # Get PEM data if requested
+                cert_pem_data = None
+                if load_pem_data:
+                    cert_pem_data = cert_data.decode('utf-8')
+
+                # Create Certificate object
+                certificate = Certificate(
+                    cert_filename,
+                    cert,
+                    cert_pem_data=cert_pem_data,
+                    key_filename=key_filename,
+                    key_pem_data=key_pem_data
+                )
+                certificates.append(certificate)
+
             except ValueError as e:
-                print(f"Failed to load certificate {cert_tuple}: {e}")
+                print(f"Failed to load certificate {cert_filename}: {e}")
+            except FileNotFoundError as e:
+                print(f"Failed to find certificate file {cert_filename}: {e}")
 
         print(f"Loaded {len(certificates)} certificates")
         return certificates

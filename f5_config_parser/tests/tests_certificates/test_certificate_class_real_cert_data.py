@@ -5,6 +5,7 @@ from cryptography import x509
 from cryptography.x509.oid import ExtensionOID, NameOID
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.backends import default_backend
 from datetime import datetime, timedelta, timezone
 import shutil
 from unittest.mock import Mock, patch
@@ -196,12 +197,16 @@ class TestCertificateRealisticData:
 
     def test_digicert_ca_certificate(self, temp_cert_dir, digicert_ca_data):
         """Test DigiCert CA certificate with real data attributes"""
+        # Write certificate file
         cert_file = temp_cert_dir / "DigiCertCA.crt"
         cert_file.write_bytes(digicert_ca_data['cert_pem'])
 
-        clean_to_filesystem = {('certificate', "/Common/DigiCertCA.crt"): "DigiCertCA.crt"}
+        # Load and parse certificate
+        cert_data = cert_file.read_bytes()
+        cert_obj = x509.load_pem_x509_certificate(cert_data, default_backend())
 
-        cert = Certificate(('certificate', "/Common/DigiCertCA.crt"), "DigiCertCA.crt", temp_cert_dir, clean_to_filesystem)
+        # Create Certificate object
+        cert = Certificate("/Common/DigiCertCA.crt", cert_obj)
 
         expected = digicert_ca_data['expected_attributes']
 
@@ -222,7 +227,6 @@ class TestCertificateRealisticData:
 
         # Test no matching key file for CA
         assert cert.key_filename is None
-        assert cert.key_filesystem_filename is None
 
     def test_signed_certificate_with_matching_key(self, temp_cert_dir, signed_cert_data):
         """Test signed certificate with real data attributes and matching key"""
@@ -232,16 +236,19 @@ class TestCertificateRealisticData:
         cert_file.write_bytes(signed_cert_data['cert_pem'])
         key_file.write_bytes(signed_cert_data['key_pem'])
 
-        clean_to_filesystem = {
-            ('certificate', "/Legacy-CSC/servicedeskdr.aust.csc.com.crt"): "servicedeskdr.aust.csc.com.crt",
-            ('key', "/Legacy-CSC/servicedeskdr.aust.csc.com.key"): "servicedeskdr.aust.csc.com.key"
-        }
+        # Load and parse certificate
+        cert_data = cert_file.read_bytes()
+        cert_obj = x509.load_pem_x509_certificate(cert_data, default_backend())
 
+        # Load key PEM data
+        key_pem_data = key_file.read_text(encoding='utf-8')
+
+        # Create Certificate object with key
         cert = Certificate(
-            ('certificate', "/Legacy-CSC/servicedeskdr.aust.csc.com.crt"),
-            "servicedeskdr.aust.csc.com.crt",
-            temp_cert_dir,
-            clean_to_filesystem
+            "/Legacy-CSC/servicedeskdr.aust.csc.com.crt",
+            cert_obj,
+            key_filename="/Legacy-CSC/servicedeskdr.aust.csc.com.key",
+            key_pem_data=key_pem_data
         )
 
         expected = signed_cert_data['expected_attributes']
@@ -263,7 +270,6 @@ class TestCertificateRealisticData:
 
         # Test matching key file found
         assert cert.key_filename == "/Legacy-CSC/servicedeskdr.aust.csc.com.key"
-        assert cert.key_filesystem_filename == "servicedeskdr.aust.csc.com.key"
 
     def test_certificate_chain_relationship(self, temp_cert_dir, digicert_ca_data, signed_cert_data):
         """Test that we can identify certificate chain relationships"""
@@ -273,18 +279,17 @@ class TestCertificateRealisticData:
         ca_file.write_bytes(digicert_ca_data['cert_pem'])
         cert_file.write_bytes(signed_cert_data['cert_pem'])
 
-        clean_to_filesystem = {
-            ('certificate', "/Common/DigiCertCA.crt"): "DigiCertCA.crt",
-            ('certificate', "/Legacy-CSC/servicedeskdr.aust.csc.com.crt"): "servicedeskdr.aust.csc.com.crt"
-        }
+        # Load and parse CA certificate
+        ca_cert_data = ca_file.read_bytes()
+        ca_cert_obj = x509.load_pem_x509_certificate(ca_cert_data, default_backend())
 
-        ca_cert = Certificate(('certificate', "/Common/DigiCertCA.crt"), "DigiCertCA.crt", temp_cert_dir, clean_to_filesystem)
-        signed_cert = Certificate(
-            ('certificate', "/Legacy-CSC/servicedeskdr.aust.csc.com.crt"),
-            "servicedeskdr.aust.csc.com.crt",
-            temp_cert_dir,
-            clean_to_filesystem
-        )
+        # Load and parse signed certificate
+        signed_cert_data_bytes = cert_file.read_bytes()
+        signed_cert_obj = x509.load_pem_x509_certificate(signed_cert_data_bytes, default_backend())
+
+        # Create Certificate objects
+        ca_cert = Certificate("/Common/DigiCertCA.crt", ca_cert_obj)
+        signed_cert = Certificate("/Legacy-CSC/servicedeskdr.aust.csc.com.crt", signed_cert_obj)
 
         # Test certificate chain relationship
         # The signed certificate's AKI should match the CA's SKI
@@ -301,9 +306,12 @@ class TestCertificateRealisticData:
         ca_file = temp_cert_dir / "DigiCertCA.crt"
         ca_file.write_bytes(digicert_ca_data['cert_pem'])
 
-        clean_to_filesystem = {('certificate', "/Common/DigiCertCA.crt"): "DigiCertCA.crt"}
+        # Load and parse CA certificate
+        ca_cert_data_bytes = ca_file.read_bytes()
+        ca_cert_obj = x509.load_pem_x509_certificate(ca_cert_data_bytes, default_backend())
 
-        ca_cert = Certificate(('certificate', "/Common/DigiCertCA.crt"), "DigiCertCA.crt", temp_cert_dir, clean_to_filesystem)
+        # Create Certificate object
+        ca_cert = Certificate("/Common/DigiCertCA.crt", ca_cert_obj)
 
         ca_repr = repr(ca_cert)
         assert "Certificate CA:" in ca_repr
@@ -315,14 +323,12 @@ class TestCertificateRealisticData:
         cert_file = temp_cert_dir / "servicedeskdr.aust.csc.com.crt"
         cert_file.write_bytes(signed_cert_data['cert_pem'])
 
-        clean_to_filesystem = {('certificate', "/Legacy-CSC/servicedeskdr.aust.csc.com.crt"): "servicedeskdr.aust.csc.com.crt"}
+        # Load and parse signed certificate
+        signed_cert_data_bytes = cert_file.read_bytes()
+        signed_cert_obj = x509.load_pem_x509_certificate(signed_cert_data_bytes, default_backend())
 
-        signed_cert = Certificate(
-            ('certificate', "/Legacy-CSC/servicedeskdr.aust.csc.com.crt"),
-            "servicedeskdr.aust.csc.com.crt",
-            temp_cert_dir,
-            clean_to_filesystem
-        )
+        # Create Certificate object
+        signed_cert = Certificate("/Legacy-CSC/servicedeskdr.aust.csc.com.crt", signed_cert_obj)
 
         signed_repr = repr(signed_cert)
         assert "Certificate Cert:" in signed_repr
@@ -335,14 +341,12 @@ class TestCertificateRealisticData:
         cert_file = temp_cert_dir / "servicedeskdr.aust.csc.com.crt"
         cert_file.write_bytes(signed_cert_data['cert_pem'])
 
-        clean_to_filesystem = {('certificate', "/Legacy-CSC/servicedeskdr.aust.csc.com.crt"): "servicedeskdr.aust.csc.com.crt"}
+        # Load and parse certificate
+        cert_data = cert_file.read_bytes()
+        cert_obj = x509.load_pem_x509_certificate(cert_data, default_backend())
 
-        cert = Certificate(
-            ('certificate', "/Legacy-CSC/servicedeskdr.aust.csc.com.crt"),
-            "servicedeskdr.aust.csc.com.crt",
-            temp_cert_dir,
-            clean_to_filesystem
-        )
+        # Create Certificate object
+        cert = Certificate("/Legacy-CSC/servicedeskdr.aust.csc.com.crt", cert_obj)
 
         # This certificate expired in 2021, so it should be expired now
         assert cert.not_valid_after < datetime.now(timezone.utc)
@@ -353,14 +357,12 @@ class TestCertificateRealisticData:
         cert_file = temp_cert_dir / "servicedeskdr.aust.csc.com.crt"
         cert_file.write_bytes(signed_cert_data['cert_pem'])
 
-        clean_to_filesystem = {('certificate', "/Legacy-CSC/servicedeskdr.aust.csc.com.crt"): "servicedeskdr.aust.csc.com.crt"}
+        # Load and parse certificate
+        cert_data = cert_file.read_bytes()
+        cert_obj = x509.load_pem_x509_certificate(cert_data, default_backend())
 
-        cert = Certificate(
-            ('certificate', "/Legacy-CSC/servicedeskdr.aust.csc.com.crt"),
-            "servicedeskdr.aust.csc.com.crt",
-            temp_cert_dir,
-            clean_to_filesystem
-        )
+        # Create Certificate object
+        cert = Certificate("/Legacy-CSC/servicedeskdr.aust.csc.com.crt", cert_obj)
 
         # Mock the collection
         mock_collection = Mock()

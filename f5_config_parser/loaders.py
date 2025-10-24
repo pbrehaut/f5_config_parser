@@ -10,7 +10,7 @@ def load_collection_with_certificates(config_path: str, tar_path: str) -> Stanza
     with open(config_path) as f:
         collection = StanzaCollection.from_config(f.read(), initialise=True)
 
-    certificates = load_certificates_from_tar(tar_path)
+    certificates = load_certificates_from_tar(tar_path, load_pem_data=True)
     collection += certificates
 
     collection.initialise_dependencies()
