@@ -11,7 +11,7 @@ class IRuleStanza(ConfigStanza):
 
     def _do_parse(self) -> Dict[str, Any]:
         """Custom parsing for iRules using Tcl parser"""
-        return parse_irule(self.config_lines)
+        return parse_irule(self.config_lines[1:])
 
     def _discover_dependencies(self, collection: 'StanzaCollection') -> List[str]:
         """Discover dependencies using collection filtering"""

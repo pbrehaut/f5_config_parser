@@ -18,7 +18,7 @@ class VirtualServerStanza(ConfigStanza):
 
     def _do_parse(self) -> Dict[str, Any]:
         """Do additional processing for IPs after initial parsing"""
-        parsed_from_base = self._parse_lines(self.config_lines, 0)[0]
+        parsed_from_base = self._parse_lines(self.config_lines, 1)[0]
         if 'destination' in parsed_from_base:
             parsed_from_base.update(
                 extract_fields(parsed_from_base['destination'], required_fields=['ip_address', 'port'])

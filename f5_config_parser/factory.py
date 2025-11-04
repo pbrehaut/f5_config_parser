@@ -15,7 +15,9 @@ from f5_config_parser.stanza import (
     RouteStanza,
     VlanStanza,
     SNATPoolStanza,
-    HTTPSMonitorStanza
+    HTTPSMonitorStanza,
+    WideIPStanza,
+    GTMPoolStanza,
 )
 
 
@@ -65,7 +67,7 @@ class StanzaFactory:
                 stanza_end = cls._find_stanza_end(lines, i + 1, prefix_tuple)
 
                 # Extract content lines (everything between header and end)
-                content_lines = lines[i + 1:stanza_end]
+                content_lines = lines[i:stanza_end]
 
                 # Remove the closing brace if present
                 content_lines = cls._clean_content_lines(content_lines)
@@ -158,6 +160,8 @@ class StanzaFactory:
             ("net", "self"): SelfIPStanza,
             ("net", "route"): RouteStanza,
             ("net", "vlan"): VlanStanza,
+            ("gtm", "wideip", "a"): WideIPStanza,
+            ("gtm", "pool", "a"): GTMPoolStanza,
             ("security", "protocol-inspection", "compliance-objects"): CliAdminPartitionsStanza,
         }
         stanza_class = registry.get(prefix, GenericStanza)

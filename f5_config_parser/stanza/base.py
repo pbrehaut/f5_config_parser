@@ -22,6 +22,7 @@ class ConfigStanza:
         self.name = name
         self._changes: List[ChangeRecord] = []
         self._parsed_config: Optional[Dict[str, Any]] = None
+        self._partition_override: Optional[str] = None
         self._dependencies: Optional[List[str]] = None
         self._dependents: Optional[List[str]] = None
         self._dependency_map: Optional[Dict[Tuple[str, str], List[str]]] = None
@@ -57,14 +58,17 @@ class ConfigStanza:
 
     def __str__(self):
         """Return F5 configuration format with full path and braces"""
-        if self.config_lines:
-            lines = [f"{self.full_path} {{"]
+        if len(self.config_lines) > 1:
+            lines = []
             lines.extend(self.config_lines)
             lines.append("}")
             return '\n'.join(lines) + '\n'
+        elif len(self.config_lines) == 1:
+            # Single line stanza, no braces
+            return f"{self.config_lines[0]}\n"
         else:
-            lines = f"{self.full_path} {{ }}\n"
-            return lines
+            # Empty stanza
+            return ""
 
     def __lt__(self, other):
         """Sort by full_path attribute, with ('ltm', 'virtual') prefix taking precedence"""
@@ -276,6 +280,41 @@ class ConfigStanza:
         """Complete stanza identifier: prefix + name"""
         return f"{' '.join(self.prefix)} {self.name}"
 
+    @property
+    def partition(self) -> str:
+        """
+        Get partition name from object name or user override.
+
+        Returns the partition name if:
+        1. User has explicitly set a partition override, OR
+        2. Name follows the /partition_name/obj_name pattern
+        Otherwise defaults to "Common".
+        """
+        # Check for user override first
+        if self._partition_override is not None:
+            return self._partition_override
+
+        # Extract from name
+        if self.name.startswith('/'):
+            parts = self.name.split('/')
+            if len(parts) >= 2:
+                return parts[1]
+
+        return "Common"
+
+    @partition.setter
+    def partition(self, value: str) -> None:
+        """
+        Override the partition name for this object.
+
+        This allows forcing an object into a specific partition config file
+        during archive reconstruction, regardless of what the name suggests.
+
+        Args:
+            value: Partition name to use (e.g., "Production", "Common")
+        """
+        self._partition_override = value
+
     def _invalidate_cache(self):
         """Reset parsed config, dependencies, dependents, and dependency map cache"""
         self._parsed_config = None
@@ -292,7 +331,7 @@ class ConfigStanza:
 
     def _do_parse(self) -> Dict[str, Any]:
         """Override this method in subclasses for custom parsing"""
-        return self._parse_lines(self.config_lines, 0)[0]
+        return self._parse_lines(self.config_lines, 1)[0]
 
     def get_config_value(self, key: str) -> Any:
         """Convenience method to get parsed config values"""
@@ -502,28 +541,35 @@ class ConfigStanza:
                 invalidate_callback=self._invalidate_cache
             )
 
-    def log_addition(self, collection_name: str = "collection", change_id: Optional[str] = None) -> None:
+    def log_collection_operation(self, operation: str, collection_name: str = "collection",
+                                 change_id: Optional[str] = None) -> None:
         """
-        Log the addition of this stanza to a collection.
+        Log a collection operation (addition or removal) for this stanza.
 
         Args:
-            collection_name: Name of the collection this stanza is being added to
+            operation: Type of operation ("addition" or "removal")
+            collection_name: Name of the collection being operated on
             change_id: Optional change ID for tracking related operations
         """
         if change_id is None:
             change_id = str(uuid.uuid4())[:8]
 
+        operation_messages = {
+            "addition": f"Added to {collection_name}",
+            "removal": f"Removed from {collection_name}"
+        }
+
         change_record = ChangeRecord(
             change_id=change_id,
             timestamp=datetime.now(),
-            line_index=-1,  # -1 indicates collection-level operation
+            line_index=-1,
             old_content=None,
-            new_content=f"Added to {collection_name}",
+            new_content=operation_messages[operation],
             search_pattern="N/A",
             replacement="N/A",
             match_found="N/A",
-            change_type="addition",
-            source_operation="manual_addition_to_collection"
+            change_type=operation,
+            source_operation=f"manual_{operation}_to_collection"
         )
         self._changes.append(change_record)
-        print(f"Logged change: {change_record.source_operation} - {self.full_path} added to {collection_name}")
+        print(f"Logged change: {change_record.source_operation} - {self.full_path} {operation} {collection_name}")

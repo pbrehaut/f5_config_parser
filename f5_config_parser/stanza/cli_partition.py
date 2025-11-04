@@ -33,6 +33,17 @@ class CliAdminPartitionsStanza(ConfigStanza):
         """Get the original path without unique identifier suffix"""
         return f"{' '.join(self.prefix)} {self.name}"
 
+    @property
+    def partition(self) -> str:
+        """
+        Override to extract partition from update-partition command in config lines.
+
+        Returns the partition name from the update-partition command,
+        or defaults to "Common" if not found.
+        """
+        partition_name = self.get_partition_name()
+        return partition_name if partition_name else "Common"
+
     def _extract_unique_identifier(self) -> str:
         """Extract unique identifier from config lines (e.g., partition name)"""
         for line in self.config_lines:
@@ -58,16 +69,6 @@ class CliAdminPartitionsStanza(ConfigStanza):
         # Generate short hash (first 8 characters should be sufficient for uniqueness)
         content_hash = hashlib.md5(content_str.encode()).hexdigest()[:8]
         return f"hash_{content_hash}"
-
-    def __str__(self) -> str:
-        """Return F5 configuration format using original path (without unique suffix)"""
-        if self.config_lines:
-            lines = [f"{self.original_path} {{"]
-            lines.extend(self.config_lines)
-            lines.append("}")
-            return '\n'.join(lines) + '\n'
-        else:
-            return f"{self.original_path} {{ }}\n"
 
     def get_partition_name(self) -> str:
         """Convenience method to extract the partition name from update-partition command"""

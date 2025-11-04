@@ -11,36 +11,6 @@ from cryptography.hazmat.backends import default_backend
 from f5_config_parser.certificates.certificate import Certificate
 
 
-def extract_tar(tar_path: str) -> Path:
-    """Extract tar to temporary directory and return extraction path"""
-    tar_path = Path(tar_path)
-
-    if not tar_path.exists():
-        raise FileNotFoundError(f"Tar file not found: {tar_path}")
-
-    # Create temporary directory
-    extract_dir = Path(tempfile.mkdtemp(prefix="f5_certs_"))
-
-    try:
-        # Extract with Windows-safe filenames
-        with tarfile.open(tar_path, 'r') as tar:
-            for member in tar.getmembers():
-                if member.isfile():
-                    # Sanitise filename for Windows
-                    safe_name = member.name.replace(':', '_COLON_')
-                    target_path = extract_dir / safe_name
-                    target_path.parent.mkdir(parents=True, exist_ok=True)
-
-                    # Extract file content
-                    file_obj = tar.extractfile(member)
-                    if file_obj:
-                        target_path.write_bytes(file_obj.read())
-    except (tarfile.TarError, OSError) as e:
-        raise ValueError(f"Failed to extract tar file {tar_path}: {e}")
-
-    return extract_dir
-
-
 def parse_f5_filename(filesystem_filename: str) -> tuple[str, str]:
     """
     Convert filesystem filename to (file_type, clean_f5_name) tuple
@@ -90,6 +60,36 @@ def parse_f5_filename(filesystem_filename: str) -> tuple[str, str]:
     clean_f5_name = f5_part.replace(':', '/')
 
     return (file_type, clean_f5_name)
+
+
+def extract_tar(tar_path: str) -> Path:
+    """Extract tar to temporary directory and return extraction path"""
+    tar_path = Path(tar_path)
+
+    if not tar_path.exists():
+        raise FileNotFoundError(f"Tar file not found: {tar_path}")
+
+    # Create temporary directory
+    extract_dir = Path(tempfile.mkdtemp(prefix="f5_certs_"))
+
+    try:
+        # Extract with Windows-safe filenames
+        with tarfile.open(tar_path, 'r') as tar:
+            for member in tar.getmembers():
+                if member.isfile():
+                    # Sanitise filename for Windows
+                    safe_name = member.name.replace(':', '_COLON_')
+                    target_path = extract_dir / safe_name
+                    target_path.parent.mkdir(parents=True, exist_ok=True)
+
+                    # Extract file content
+                    file_obj = tar.extractfile(member)
+                    if file_obj:
+                        target_path.write_bytes(file_obj.read())
+    except (tarfile.TarError, OSError) as e:
+        raise ValueError(f"Failed to extract tar file {tar_path}: {e}")
+
+    return extract_dir
 
 
 def build_filename_mappings(extract_dir: Path) -> tuple[dict, dict]:
@@ -155,6 +155,7 @@ def load_certificates_from_tar(tar_file_path: str, load_pem_data: bool = False) 
             key_tuple = ('key', cert_filename.replace('.crt', '.key'))
             key_filename = None
             key_pem_data = None
+            key_filesystem_filename = None
 
             if key_tuple in clean_to_filesystem:
                 key_filename = cert_filename.replace('.crt', '.key')
@@ -179,13 +180,15 @@ def load_certificates_from_tar(tar_file_path: str, load_pem_data: bool = False) 
                 if load_pem_data:
                     cert_pem_data = cert_data.decode('utf-8')
 
-                # Create Certificate object
+                # Create Certificate object with original archive filenames
                 certificate = Certificate(
                     cert_filename,
                     cert,
                     cert_pem_data=cert_pem_data,
                     key_filename=key_filename,
-                    key_pem_data=key_pem_data
+                    key_pem_data=key_pem_data,
+                    original_cert_filename=cert_filesystem_filename,
+                    original_key_filename=key_filesystem_filename
                 )
                 certificates.append(certificate)
 

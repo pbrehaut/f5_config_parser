@@ -7,6 +7,7 @@ def test_virtual_server_str_simple():
     prefix = ("ltm", "virtual")
     name = "my-vs"
     config_lines = [
+        "ltm virtual my-vs {",
         "    destination 192.168.1.100:80",
         "    pool my-pool"
     ]
@@ -22,6 +23,7 @@ def test_virtual_server_str_with_profiles():
     prefix = ("ltm", "virtual")
     name = "web-vs"
     config_lines = [
+        "ltm virtual web-vs {",
         "    destination 10.0.1.50:443",
         "    pool web-pool",
         "    profiles {",
@@ -55,6 +57,7 @@ def test_virtual_server_str_with_rules():
     prefix = ("ltm", "virtual")
     name = "app-vs"
     config_lines = [
+        "ltm virtual app-vs {",
         "    destination 172.16.1.10:80",
         "    pool app-pool",
         "    rules {",
@@ -79,8 +82,22 @@ def test_virtual_server_str_with_rules():
 
 def test_multiple_virtual_servers_concatenation():
     """Test that multiple virtual servers print without blank lines between them"""
-    vs1 = VirtualServerStanza(("ltm", "virtual"), "vs1", ["    destination 1.1.1.1:80"])
-    vs2 = VirtualServerStanza(("ltm", "virtual"), "vs2", ["    destination 2.2.2.2:80"])
+    vs1 = VirtualServerStanza(
+        ("ltm", "virtual"),
+        "vs1",
+        [
+            "ltm virtual vs1 {",
+            "    destination 1.1.1.1:80"
+        ]
+    )
+    vs2 = VirtualServerStanza(
+        ("ltm", "virtual"),
+        "vs2",
+        [
+            "ltm virtual vs2 {",
+            "    destination 2.2.2.2:80"
+        ]
+    )
 
     combined_output = str(vs1) + str(vs2)
 
@@ -96,9 +113,26 @@ def test_multiple_virtual_servers_concatenation():
 
 if __name__ == "__main__":
     # Sample data test
-    vs1 = VirtualServerStanza(("ltm", "virtual"), "test-vs", ["    destination 192.168.1.100:80", "    pool test-pool"])
-    vs2 = VirtualServerStanza(("ltm", "virtual"), "secure-vs",
-                              ["    destination 10.0.1.50:443", "    profiles {", "        ssl { }", "    }"])
+    vs1 = VirtualServerStanza(
+        ("ltm", "virtual"),
+        "test-vs",
+        [
+            "ltm virtual test-vs {",
+            "    destination 192.168.1.100:80",
+            "    pool test-pool"
+        ]
+    )
+    vs2 = VirtualServerStanza(
+        ("ltm", "virtual"),
+        "secure-vs",
+        [
+            "ltm virtual secure-vs {",
+            "    destination 10.0.1.50:443",
+            "    profiles {",
+            "        ssl { }",
+            "    }"
+        ]
+    )
 
     print(str(vs1) + str(vs2))
     pass

@@ -35,15 +35,15 @@ def collection(test_stanzas):
     return StanzaCollection([stanza1])
 
 
-def test_log_addition_method_direct_call(test_stanzas):
-    """Test calling log_addition method directly"""
+def test_log_collection_operation_method_direct_call(test_stanzas):
+    """Test calling log_collection_operation method directly for addition"""
     _, stanza2, _ = test_stanzas
 
     # Clear any existing changes
     stanza2._changes.clear()
 
-    # Call log_addition directly
-    stanza2.log_addition("test_collection", "test_change_001")
+    # Call log_collection_operation directly
+    stanza2.log_collection_operation("addition", "test_collection", "test_change_001")
 
     # Verify change was logged
     assert len(stanza2._changes) == 1
@@ -57,15 +57,15 @@ def test_log_addition_method_direct_call(test_stanzas):
     assert change.source_operation == "manual_addition_to_collection"
 
 
-def test_log_addition_method_auto_change_id(test_stanzas):
-    """Test log_addition with auto-generated change ID"""
+def test_log_collection_operation_method_auto_change_id(test_stanzas):
+    """Test log_collection_operation with auto-generated change ID"""
     _, stanza2, _ = test_stanzas
 
     # Clear any existing changes
     stanza2._changes.clear()
 
-    # Call log_addition without change_id
-    stanza2.log_addition("another_collection")
+    # Call log_collection_operation without change_id
+    stanza2.log_collection_operation("addition", "another_collection")
 
     # Verify change was logged with auto-generated ID
     assert len(stanza2._changes) == 1
@@ -130,28 +130,6 @@ def test_iadd_multiple_stanzas_logging(mock_print, collection, test_stanzas):
     change3 = stanza3._changes[0]
     assert change3.change_type == "addition"
     assert change3.new_content == "Added to StanzaCollection"
-
-
-@patch('builtins.print')
-def test_add_operator_logging(mock_print, collection, test_stanzas):
-    """Test logging when using + operator to create new collection"""
-    _, stanza2, _ = test_stanzas
-
-    # Clear existing changes
-    stanza2._changes.clear()
-
-    # Create new collection using +
-    new_collection = collection + stanza2
-
-    # Verify new collection was created
-    assert new_collection is not collection
-    assert len(new_collection) == 2
-
-    # Verify logging occurred
-    assert len(stanza2._changes) == 1
-    change = stanza2._changes[0]
-    assert change.change_type == "addition"
-    assert change.new_content == "Added to StanzaCollection"
 
 
 @patch('builtins.print')
@@ -284,11 +262,6 @@ def test_logging_operation_types(mock_print, collection, test_stanzas, operation
         assert len(stanza2._changes) == 1
         assert len(stanza3._changes) == 1
 
-    elif operation_type == "add_operator":
-        new_collection = collection + stanza2
-        assert len(stanza2._changes) == 1
-        assert new_collection is not collection
-
     elif operation_type == "collection_to_collection":
         collection2 = StanzaCollection([stanza2, stanza3])
         collection += collection2
@@ -306,7 +279,7 @@ def test_change_id_uniqueness(test_stanzas):
     # Add multiple times to generate multiple change IDs
     change_ids = set()
     for i in range(5):
-        stanza2.log_addition(f"collection_{i}")
+        stanza2.log_collection_operation("addition", f"collection_{i}")
         change_ids.add(stanza2._changes[-1].change_id)
 
     # Verify all change IDs are unique
@@ -324,7 +297,7 @@ def test_logging_with_custom_collection_name(test_stanzas):
     collection_names = ["my_custom_collection", "prod_config", "backup_set_1"]
 
     for name in collection_names:
-        stanza2.log_addition(name)
+        stanza2.log_collection_operation("addition", name)
 
     # Verify each addition was logged with correct collection name
     assert len(stanza2._changes) == 3

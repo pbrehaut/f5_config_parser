@@ -16,8 +16,17 @@ class DuplicateStanzaError(Exception):
 class StanzaCollection:
     """Collection of stanzas with bulk operations and analysis methods"""
 
-    def __init__(self, stanzas: List[ConfigStanza], config_str: Optional[str] = None):
-        """Basic constructor - stores stanzas and optional config string"""
+    def __init__(self, stanzas: List[ConfigStanza],
+                 config_str: Optional[str] = None,
+                 config_hash_str: Optional[str] = None):
+        """Basic constructor - stores stanzas and optional config string
+
+        Args:
+            stanzas: List of configuration stanzas
+            config_str: Config string for this specific collection (optional)
+            config_hash_str: Full config string for dependency cache hashing
+                            (optional, defaults to config_str if not provided)
+        """
         # Check for duplicate full_path attributes in the initial stanzas
         full_paths = [stanza.full_path for stanza in stanzas]
         duplicates = [path for path, count in Counter(full_paths).items() if count > 1]
@@ -28,13 +37,18 @@ class StanzaCollection:
 
         self.stanzas = stanzas
         self.config_str = config_str
-        self._cache = DependencyCache(config_str) if config_str else None
+
+        # Use config_hash_str for cache, fall back to config_str
+        cache_str = config_hash_str if config_hash_str is not None else config_str
+        self._cache = DependencyCache(cache_str) if cache_str else None
 
     @classmethod
     def from_config(cls,
                     config_text: str,
-                    initialise: bool = True,  # Keep True as default for main entry point
-                    validate: bool = True) -> 'StanzaCollection':
+                    initialise: bool = True,
+                    validate: bool = True,
+                    source_config_file: Optional[str] = None,
+                    config_hash_str: Optional[str] = None) -> 'StanzaCollection':
         """Create collection from config text with optional full initialisation.
 
         This is the primary entry point for creating a StanzaCollection.
@@ -43,12 +57,20 @@ class StanzaCollection:
             config_text: Raw F5 configuration text
             initialise: If True, run full initialisation (ip_rd + dependencies)
             validate: If True, validate the parsed configuration
+            source_config_file: Original config file path to stamp on all stanzas (optional)
+            config_hash_str: Full config string for dependency cache hashing (optional)
         """
         if not config_text.strip():
             raise ValueError("Empty config string provided")
 
         parsed_stanzas = StanzaFactory.parse_stanzas(config_text)
-        collection = cls(parsed_stanzas, config_text)
+
+        # Stamp source file on all stanzas if provided
+        if source_config_file:
+            for stanza in parsed_stanzas:
+                stanza.source_config_file = source_config_file
+
+        collection = cls(parsed_stanzas, config_text, config_hash_str=config_hash_str)
 
         if validate:
             validate_config(config_text, collection)
@@ -185,14 +207,16 @@ class StanzaCollection:
         # Add all stanzas since no duplicates found
         new_stanzas.extend(other_stanzas)
 
-        # Log addition for each new stanza
-        for stanza in other_stanzas:
-            stanza.log_addition("StanzaCollection")
-
         return StanzaCollection(new_stanzas)
 
-    def __iadd__(self, other: Union[ConfigStanza, List[ConfigStanza], 'StanzaCollection']) -> 'StanzaCollection':
-        """Add items to this collection in-place."""
+    def __iadd__(self, other: Union[ConfigStanza, List[ConfigStanza], 'StanzaCollection'],
+                 log_additions: bool = True) -> 'StanzaCollection':
+        """Add items to this collection in-place.
+
+        Args:
+            other: Stanzas to add (single stanza, list of stanzas, or another collection)
+            log_additions: If True, log the addition of each stanza (default True)
+        """
         other_stanzas = self._normalise_items(other)
 
         # Check for duplicates within the argument being added
@@ -218,9 +242,10 @@ class StanzaCollection:
         # Add all stanzas since no duplicates found
         self.stanzas.extend(other_stanzas)
 
-        # Log addition for each new stanza
-        for stanza in other_stanzas:
-            stanza.log_addition("StanzaCollection")
+        # Log addition for each new stanza if requested
+        if log_additions:
+            for stanza in other_stanzas:
+                stanza.log_collection_operation("addition", "StanzaCollection")
 
         return self
 
@@ -234,10 +259,23 @@ class StanzaCollection:
 
         return StanzaCollection(new_stanzas)
 
-    def __isub__(self, other: Union[ConfigStanza, List[ConfigStanza], 'StanzaCollection']) -> 'StanzaCollection':
-        """Remove specified items from this collection in-place."""
+    def __isub__(self, other: Union[ConfigStanza, List[ConfigStanza], 'StanzaCollection'],
+                 log_removals: bool = True) -> 'StanzaCollection':
+        """Remove specified items from this collection in-place.
+
+        Args:
+            other: Stanzas to remove (single stanza, list of stanzas, or another collection)
+            log_removals: If True, log the removal of each stanza (default True)
+        """
         other_stanzas = self._normalise_items(other)
         paths_to_remove = {stanza.full_path for stanza in other_stanzas}
+
+        # Log removal for stanzas that actually exist in the collection
+        if log_removals:
+            stanzas_to_remove = [stanza for stanza in self.stanzas
+                                 if stanza.full_path in paths_to_remove]
+            for stanza in stanzas_to_remove:
+                stanza.log_collection_operation("removal", "StanzaCollection")
 
         self.stanzas = [stanza for stanza in self.stanzas
                         if stanza.full_path not in paths_to_remove]

@@ -1,12 +1,11 @@
 """Certificate class inheriting from ConfigStanza for unified collection support"""
-from pathlib import Path
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, hashes
-from cryptography.hazmat.primitives.asymmetric import rsa, ec, padding
 import binascii
 from typing import List, Optional, TYPE_CHECKING
 from f5_config_parser.stanza import ConfigStanza
+from f5_config_parser.f5_path_utils import rename_f5_archive_path
 
 if TYPE_CHECKING:
     from f5_config_parser.collection import StanzaCollection
@@ -18,7 +17,9 @@ class Certificate(ConfigStanza):
     def __init__(self, cert_filename: str, cert: x509.Certificate,
                  cert_pem_data: Optional[str] = None,
                  key_filename: Optional[str] = None,
-                 key_pem_data: Optional[str] = None):
+                 key_pem_data: Optional[str] = None,
+                 original_cert_filename: Optional[str] = None,
+                 original_key_filename: Optional[str] = None):
         """
         Create Certificate from parsed x509 certificate and initialise as ConfigStanza
 
@@ -28,6 +29,8 @@ class Certificate(ConfigStanza):
             cert_pem_data: Optional PEM data for the certificate
             key_filename: Optional clean filename for the matching key
             key_pem_data: Optional PEM data for the matching key
+            original_cert_filename: Optional original archive filename for certificate
+            original_key_filename: Optional original archive filename for key
         """
         # Map certificate to ConfigStanza interface
         prefix = ('certificate', 'object')
@@ -42,6 +45,11 @@ class Certificate(ConfigStanza):
         self.pem_data = cert_pem_data
         self.key_filename = key_filename
         self.key_pem_data = key_pem_data
+        self._suggested_name = None
+
+        # Store original archive filenames for reconstruction
+        self.original_cert_filename = original_cert_filename
+        self.original_key_filename = original_key_filename
 
         # Extract certificate metadata
         self.subject = cert.subject.rfc4514_string()
@@ -230,3 +238,63 @@ class Certificate(ConfigStanza):
         private_public_numbers = private_key.public_key().public_numbers()
 
         return cert_public_numbers == private_public_numbers
+
+    @property
+    def suggested_name(self) -> tuple[str, str]:
+        """
+        Suggested certificate name based on partition, CN and expiry date.
+
+        Returns:
+            tuple[str, str]: (partition, name) e.g., ('CBU-AdminNet', 'cloudcompute-proxy.au3.csc.com_2015_09')
+        """
+        if self._suggested_name is not None:
+            return self._suggested_name
+
+        # Extract CN from subject
+        cn = None
+        for component in self.subject.split(','):
+            if component.strip().startswith('CN='):
+                cn = component.strip()[3:]  # Remove 'CN=' prefix
+                break
+
+        if cn is None:
+            cn = 'unknown'
+
+        # Format expiry date as YYYY_MM
+        expiry_str = self.not_valid_after.strftime('%Y_%m')
+
+        # Return tuple of (partition, name)
+        return (self.partition, f"{cn}_{expiry_str}")
+
+    @suggested_name.setter
+    def suggested_name(self, value: tuple[str, str]):
+        """Allow manual override of suggested name as (partition, name) tuple"""
+        self._suggested_name = value
+
+    def get_suggested_original_cert_filename(self) -> Optional[str]:
+        """Get suggested renamed original certificate filename"""
+        if not self.original_cert_filename:
+            return None
+        new_partition, new_name = self.suggested_name
+        return rename_f5_archive_path(
+            self.original_cert_filename,
+            self.filename,
+            new_partition,
+            new_name,
+            dir_separator="\\",
+            colon_format="_COLON_"
+        )
+
+    def get_suggested_original_key_filename(self) -> Optional[str]:
+        """Get suggested renamed original key filename"""
+        if not self.original_key_filename:
+            return None
+        new_partition, new_name = self.suggested_name
+        return rename_f5_archive_path(
+            self.original_key_filename,
+            self.key_filename,
+            new_partition,
+            new_name,
+            dir_separator="\\",
+            colon_format="_COLON_"
+        )

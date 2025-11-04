@@ -65,11 +65,13 @@ class TestIRuleStanza:
     def simple_irule_content(self):
         """Simple iRule with basic HTTP event"""
         return [
-            "when HTTP_REQUEST {",
-            "    if { [HTTP::uri] starts_with \"/api/\" } {",
-            "        pool /Common/api_pool",
-            "    } else {",
-            "        pool /Common/web_pool",
+            "ltm rule /Common/simple_irule {",
+            "    when HTTP_REQUEST {",
+            "        if { [HTTP::uri] starts_with \"/api/\" } {",
+            "            pool /Common/api_pool",
+            "        } else {",
+            "            pool /Common/web_pool",
+            "        }",
             "    }",
             "}"
         ]
@@ -78,24 +80,26 @@ class TestIRuleStanza:
     def complex_irule_content(self):
         """Complex iRule with multiple events and logic"""
         return [
-            "when CLIENT_ACCEPTED {",
-            "    set client_ip [IP::client_addr]",
-            "    log local0. \"Client connected: $client_ip\"",
-            "}",
-            "",
-            "when HTTP_REQUEST {",
-            "    if { [HTTP::header Host] eq \"api.example.com\" } {",
-            "        HTTP::header insert \"X-Forwarded-Host\" [HTTP::header Host]",
-            "        pool /Common/api_pool",
-            "    } elsif { [HTTP::path] starts_with \"/admin\" } {",
-            "        HTTP::respond 403 content \"Access Denied\"",
-            "    } else {",
-            "        pool /Common/default_pool",
+            "ltm rule /Common/complex_irule {",
+            "    when CLIENT_ACCEPTED {",
+            "        set client_ip [IP::client_addr]",
+            "        log local0. \"Client connected: $client_ip\"",
             "    }",
-            "}",
-            "",
-            "when HTTP_RESPONSE {",
-            "    HTTP::header insert \"X-Server\" \"F5-BIG-IP\"",
+            "    ",
+            "    when HTTP_REQUEST {",
+            "        if { [HTTP::header Host] eq \"api.example.com\" } {",
+            "            HTTP::header insert \"X-Forwarded-Host\" [HTTP::header Host]",
+            "            pool /Common/api_pool",
+            "        } elsif { [HTTP::path] starts_with \"/admin\" } {",
+            "            HTTP::respond 403 content \"Access Denied\"",
+            "        } else {",
+            "            pool /Common/default_pool",
+            "        }",
+            "    }",
+            "    ",
+            "    when HTTP_RESPONSE {",
+            "        HTTP::header insert \"X-Server\" \"F5-BIG-IP\"",
+            "    }",
             "}"
         ]
 
@@ -103,13 +107,15 @@ class TestIRuleStanza:
     def http_responses_irule(self):
         """iRule focused on HTTP responses and redirects"""
         return [
-            "when HTTP_REQUEST {",
-            "    if { [HTTP::path] eq \"/maintenance\" } {",
-            "        HTTP::respond 503 content \"Service Unavailable\"",
-            "    } elsif { [HTTP::path] eq \"/old-path\" } {",
-            "        HTTP::redirect \"https://example.com/new-path\"",
-            "    } elsif { [HTTP::path] eq \"/forbidden\" } {",
-            "        HTTP::respond 403",
+            "ltm rule /Common/http_responses_irule {",
+            "    when HTTP_REQUEST {",
+            "        if { [HTTP::path] eq \"/maintenance\" } {",
+            "            HTTP::respond 503 content \"Service Unavailable\"",
+            "        } elsif { [HTTP::path] eq \"/old-path\" } {",
+            "            HTTP::redirect \"https://example.com/new-path\"",
+            "        } elsif { [HTTP::path] eq \"/forbidden\" } {",
+            "            HTTP::respond 403",
+            "        }",
             "    }",
             "}"
         ]
@@ -230,15 +236,17 @@ class TestIRuleStanza:
     def test_nested_conditionals_flow(self):
         """Test complex nested conditional flow tracking"""
         lines = [
-            "when HTTP_REQUEST {",
-            "    if { [HTTP::method] eq \"GET\" } {",
-            "        if { [HTTP::uri] starts_with \"/secure\" } {",
-            "            HTTP::respond 401",
+            "ltm rule /Common/nested_test {",
+            "    when HTTP_REQUEST {",
+            "        if { [HTTP::method] eq \"GET\" } {",
+            "            if { [HTTP::uri] starts_with \"/secure\" } {",
+            "                HTTP::respond 401",
+            "            } else {",
+            "                pool /Common/public_pool",
+            "            }",
             "        } else {",
-            "            pool /Common/public_pool",
+            "            pool /Common/post_pool",
             "        }",
-            "    } else {",
-            "        pool /Common/post_pool",
             "    }",
             "}"
         ]
@@ -269,9 +277,11 @@ class TestIRuleStanza:
     def test_actions_without_conditions(self):
         """Test actions that occur outside of conditional blocks"""
         lines = [
-            "when HTTP_REQUEST {",
-            "    log local0. \"Request received\"",
-            "    pool /Common/default_pool",
+            "ltm rule /Common/simple_test {",
+            "    when HTTP_REQUEST {",
+            "        log local0. \"Request received\"",
+            "        pool /Common/default_pool",
+            "    }",
             "}"
         ]
 
@@ -307,8 +317,10 @@ class TestIRuleStanza:
 
         # Modify the iRule
         new_lines = [
-            "when HTTP_REQUEST {",
-            "    pool /Common/new_pool",
+            "ltm rule /Common/new_test {",
+            "    when HTTP_REQUEST {",
+            "        pool /Common/new_pool",
+            "    }",
             "}"
         ]
         irule.config_lines = new_lines

@@ -10,7 +10,12 @@ class TestConfigStanza:
 
     def test_config_stanza_instantiation(self):
         """Test basic ConfigStanza instantiation"""
-        config_lines = ["description test", "enabled true"]
+        config_lines = [
+            "ltm pool /Common/test-pool {",
+            "    description test",
+            "    enabled true",
+            "}"
+        ]
         stanza = ConfigStanza(
             prefix=("ltm", "pool"),
             name="/Common/test-pool",
@@ -25,43 +30,59 @@ class TestConfigStanza:
 
     def test_config_stanza_empty_instantiation(self):
         """Test instantiation with empty values"""
+        config_lines = [" {", "}"]
         stanza = ConfigStanza(
             prefix=(),
             name="",
-            config_lines=[]
+            config_lines=config_lines
         )
 
         assert stanza.prefix == ()
         assert stanza.name == ""
-        assert stanza.config_lines == []
+        assert stanza.config_lines == config_lines
         assert stanza._parsed_config is None
 
     def test_full_path_property(self):
         """Test the full_path property calculation"""
+        config_lines = [
+            "ltm virtual /Common/web-vs {",
+            "    destination 10.0.1.100:80",
+            "}"
+        ]
         stanza = ConfigStanza(
             prefix=("ltm", "virtual"),
             name="/Common/web-vs",
-            config_lines=["destination 10.0.1.100:80"]
+            config_lines=config_lines
         )
 
         assert stanza.full_path == "ltm virtual /Common/web-vs"
 
     def test_full_path_empty_prefix(self):
         """Test full_path with empty prefix"""
+        config_lines = [
+            " global-config {",
+            "    setting value",
+            "}"
+        ]
         stanza = ConfigStanza(
             prefix=(),
             name="global-config",
-            config_lines=["setting value"]
+            config_lines=config_lines
         )
 
         assert stanza.full_path == " global-config"
 
     def test_invalidate_cache(self):
         """Test cache invalidation method"""
+        config_lines = [
+            "test test {",
+            "    test line",
+            "}"
+        ]
         stanza = ConfigStanza(
             prefix=("test",),
             name="test",
-            config_lines=["test line"]
+            config_lines=config_lines
         )
 
         # Manually set parsed config
@@ -74,17 +95,27 @@ class TestConfigStanza:
 
     def test_update_config_lines(self):
         """Test updating config lines invalidates cache"""
+        config_lines = [
+            "test test {",
+            "    old line",
+            "}"
+        ]
         stanza = ConfigStanza(
             prefix=("test",),
             name="test",
-            config_lines=["old line"]
+            config_lines=config_lines
         )
 
         # Set some parsed config
         stanza._parsed_config = {"old": "value"}
 
         # Update config lines
-        new_lines = ["new line", "another line"]
+        new_lines = [
+            "test test {",
+            "    new line",
+            "    another line",
+            "}"
+        ]
         stanza.config_lines = new_lines
 
         assert stanza.config_lines == new_lines
@@ -92,19 +123,25 @@ class TestConfigStanza:
 
     def test_append_config_line(self):
         """Test appending config line invalidates cache"""
+        config_lines = [
+            "test test {",
+            "    line 1",
+            "}"
+        ]
         stanza = ConfigStanza(
             prefix=("test",),
             name="test",
-            config_lines=["line 1"]
+            config_lines=config_lines
         )
 
         # Set some parsed config
         stanza._parsed_config = {"test": "value"}
 
-        # Append line
-        stanza.config_lines.append("line 2")
+        # Insert line before closing brace
+        stanza.config_lines.insert(-1, "    line 2")
 
-        assert stanza.config_lines == ["line 1", "line 2"]
+        assert "    line 1" in stanza.config_lines
+        assert "    line 2" in stanza.config_lines
         assert stanza._parsed_config is None
 
 
@@ -115,41 +152,45 @@ class TestGenericStanza:
     def pool_config_lines(self):
         """Sample pool configuration lines"""
         return [
-            "description test-app-pool",
-            "load-balancing-mode least-connections-member",
-            "members {",
-            "    /Common/server01:8080 {",
-            "        address 192.168.1.10",
-            "        priority-group 1",
+            "ltm pool /Common/test-pool {",
+            "    description test-app-pool",
+            "    load-balancing-mode least-connections-member",
+            "    members {",
+            "        /Common/server01:8080 {",
+            "            address 192.168.1.10",
+            "            priority-group 1",
+            "        }",
+            "        /Common/server02:8080 {",
+            "            address 192.168.1.11",
+            "            priority-group 1",
+            "        }",
+            "        /Common/server03:8080 {",
+            "            address 192.168.1.12",
+            "            priority-group 2",
+            "        }",
             "    }",
-            "    /Common/server02:8080 {",
-            "        address 192.168.1.11",
-            "        priority-group 1",
-            "    }",
-            "    /Common/server03:8080 {",
-            "        address 192.168.1.12",
-            "        priority-group 2",
-            "    }",
-            "}",
-            "monitor /Common/http"
+            "    monitor /Common/http",
+            "}"
         ]
 
     @pytest.fixture
     def virtual_server_config_lines(self):
         """Sample virtual server configuration lines"""
         return [
-            "destination 10.0.1.100:443",
-            "ip-protocol tcp",
-            "pool /Common/web_pool",
-            "profiles {",
-            "    /Common/tcp { }",
-            "    /Common/http { }",
-            "    /Common/clientssl {",
-            "        context clientside",
+            "ltm virtual /Common/test-vs {",
+            "    destination 10.0.1.100:443",
+            "    ip-protocol tcp",
+            "    pool /Common/web_pool",
+            "    profiles {",
+            "        /Common/tcp { }",
+            "        /Common/http { }",
+            "        /Common/clientssl {",
+            "            context clientside",
+            "        }",
             "    }",
-            "}",
-            "rules {",
-            "    /Common/redirect_rule",
+            "    rules {",
+            "        /Common/redirect_rule",
+            "    }",
             "}"
         ]
 
@@ -157,10 +198,12 @@ class TestGenericStanza:
     def simple_config_lines(self):
         """Simple key-value configuration for basic tests"""
         return [
-            "name test-config",
-            "enabled true",
-            "timeout 300",
-            "description simple test configuration"
+            "sys config simple {",
+            "    name test-config",
+            "    enabled true",
+            "    timeout 300",
+            "    description simple test configuration",
+            "}"
         ]
 
     @pytest.fixture
@@ -192,7 +235,12 @@ class TestGenericStanza:
 
     def test_generic_stanza_instantiation(self):
         """Test basic GenericStanza instantiation"""
-        config_lines = ["description test", "enabled true"]
+        config_lines = [
+            "ltm pool /Common/test-pool {",
+            "    description test",
+            "    enabled true",
+            "}"
+        ]
         stanza = GenericStanza(
             prefix=("ltm", "pool"),
             name="/Common/test-pool",
@@ -207,10 +255,15 @@ class TestGenericStanza:
 
     def test_lazy_parsing_behavior(self):
         """Test that parsing only happens when accessed"""
+        config_lines = [
+            "ltm pool /Common/test {",
+            "    description test-pool",
+            "}"
+        ]
         stanza = GenericStanza(
             prefix=("ltm", "pool"),
             name="/Common/test",
-            config_lines=["description test-pool"]
+            config_lines=config_lines
         )
 
         # Initially should be None
@@ -227,10 +280,15 @@ class TestGenericStanza:
 
     def test_cache_invalidation_on_modification(self):
         """Test that cache is invalidated when config is modified"""
+        config_lines = [
+            "ltm pool /Common/test {",
+            "    description old-description",
+            "}"
+        ]
         stanza = GenericStanza(
             prefix=("ltm", "pool"),
             name="/Common/test",
-            config_lines=["description old-description"]
+            config_lines=config_lines
         )
 
         # Parse initially
@@ -238,7 +296,12 @@ class TestGenericStanza:
         assert parsed["description"] == "old-description"
 
         # Modify config lines directly
-        stanza.config_lines = ["description new-description"]
+        new_config_lines = [
+            "ltm pool /Common/test {",
+            "    description new-description",
+            "}"
+        ]
+        stanza.config_lines = new_config_lines
 
         # Cache should be invalidated
         assert stanza._parsed_config is None
@@ -299,10 +362,14 @@ class TestGenericStanza:
 
     def test_parsing_empty_config(self):
         """Test parsing with empty configuration"""
+        config_lines = [
+            "test empty {",
+            "}"
+        ]
         stanza = GenericStanza(
             prefix=("test",),
             name="empty",
-            config_lines=[]
+            config_lines=config_lines
         )
 
         parsed = stanza.parsed_config
@@ -311,13 +378,15 @@ class TestGenericStanza:
     def test_parsing_comments_and_empty_lines(self):
         """Test that comments and empty lines are skipped"""
         config_lines = [
-            "# This is a comment",
-            "description test",
-            "",
-            "# Another comment",
-            "enabled true",
-            "   ",  # Line with just spaces
-            "timeout 300"
+            "test test {",
+            "    # This is a comment",
+            "    description test",
+            "    ",
+            "    # Another comment",
+            "    enabled true",
+            "       ",  # Line with just spaces
+            "    timeout 300",
+            "}"
         ]
 
         stanza = GenericStanza(
@@ -336,9 +405,11 @@ class TestGenericStanza:
     def test_parsing_boolean_like_values(self):
         """Test parsing lines that look like boolean flags"""
         config_lines = [
-            "flag-without-value",
-            "another-flag",
-            "setting with-value"
+            "test test {",
+            "    flag-without-value",
+            "    another-flag",
+            "    setting with-value",
+            "}"
         ]
 
         stanza = GenericStanza(
@@ -399,9 +470,9 @@ class TestGenericStanza:
         assert len(address_lines) == 3
         # Check that we get (index, content) tuples
         indices, contents = zip(*address_lines)
-        assert "        address 192.168.1.10" in contents
-        assert "        address 192.168.1.11" in contents
-        assert "        address 192.168.1.12" in contents
+        assert "            address 192.168.1.10" in contents
+        assert "            address 192.168.1.11" in contents
+        assert "            address 192.168.1.12" in contents
 
         # Verify we get the correct line indices as well
         assert all(isinstance(idx, int) for idx in indices)
@@ -421,9 +492,11 @@ class TestFindAndReplace:
     def test_find_and_replace_word_boundary(self):
         """Test word boundary matching in find and replace"""
         config_lines = [
-            "description test-pool",
-            "members server1 server2",
-            "monitor http"
+            "ltm pool /Common/test {",
+            "    description test-pool",
+            "    members server1 server2",
+            "    monitor http",
+            "}"
         ]
 
         stanza = GenericStanza(
@@ -436,7 +509,7 @@ class TestFindAndReplace:
         modifications = stanza.find_and_replace("server1", "newserver1", "word_boundary")
 
         assert modifications == 1
-        assert "members newserver1 server2" in stanza.config_lines
+        assert "    members newserver1 server2" in stanza.config_lines
         assert len(stanza._changes) == 1
 
         # Cache should be invalidated
@@ -445,8 +518,10 @@ class TestFindAndReplace:
     def test_find_and_replace_substring(self):
         """Test substring matching in find and replace"""
         config_lines = [
-            "description test-application-pool",
-            "monitor /Common/http_test"
+            "ltm pool /Common/test {",
+            "    description test-application-pool",
+            "    monitor /Common/http_test",
+            "}"
         ]
 
         stanza = GenericStanza(
@@ -458,16 +533,19 @@ class TestFindAndReplace:
         # Replace 'test' substring with 'prod'
         modifications = stanza.find_and_replace("test", "prod", "substring")
 
-        assert modifications == 2
-        assert "description prod-application-pool" in stanza.config_lines
-        assert "monitor /Common/http_prod" in stanza.config_lines
+        assert modifications == 3  # Declaration line + 2 body lines
+        assert "ltm pool /Common/prod {" in stanza.config_lines
+        assert "    description prod-application-pool" in stanza.config_lines
+        assert "    monitor /Common/http_prod" in stanza.config_lines
 
     def test_find_and_replace_whole_line(self):
         """Test whole line matching in find and replace"""
         config_lines = [
-            "description old description",
-            "enabled false",
-            "timeout 300"
+            "test test {",
+            "    description old description",
+            "    enabled false",
+            "    timeout 300",
+            "}"
         ]
 
         stanza = GenericStanza(
@@ -480,12 +558,17 @@ class TestFindAndReplace:
         modifications = stanza.find_and_replace("enabled false", "enabled true", "whole_line")
 
         assert modifications == 1
-        assert "enabled true" in stanza.config_lines
-        assert "enabled false" not in stanza.config_lines
+        assert "    enabled true" in stanza.config_lines
+        assert "    enabled false" not in stanza.config_lines
 
     def test_find_and_replace_no_matches(self):
         """Test find and replace when no matches are found"""
-        config_lines = ["description test", "enabled true"]
+        config_lines = [
+            "test test {",
+            "    description test",
+            "    enabled true",
+            "}"
+        ]
 
         stanza = GenericStanza(
             prefix=("test",),
@@ -498,12 +581,14 @@ class TestFindAndReplace:
 
         assert modifications == 0
         assert len(stanza._changes) == 0
-        # Cache should not be invalidated if no changes made
-        # (Would need to access parsed_config first to test this properly)
 
     def test_change_record_creation(self):
         """Test that ChangeRecord objects are created correctly"""
-        config_lines = ["description old-name"]
+        config_lines = [
+            "test test {",
+            "    description old-name",
+            "}"
+        ]
 
         stanza = GenericStanza(
             prefix=("test",),
@@ -518,9 +603,9 @@ class TestFindAndReplace:
 
         change = stanza._changes[0]
         assert isinstance(change, ChangeRecord)
-        assert change.line_index == 0
-        assert change.old_content == "description old-name"
-        assert change.new_content == "description new-name"
+        assert change.line_index == 1  # Second line (index 1)
+        assert change.old_content == "    description old-name"
+        assert change.new_content == "    description new-name"
         assert change.search_pattern == "old-name"
         assert change.replacement == "new-name"
         assert change.match_found == "old-name"
