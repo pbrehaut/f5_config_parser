@@ -16,3 +16,4 @@ from f5_config_parser.stanza.monitor import HTTPSMonitorStanza
 from f5_config_parser.stanza.vlan import VlanStanza
 from f5_config_parser.stanza.gtm_wideip import WideIPStanza
 from f5_config_parser.stanza.gtm_pool import GTMPoolStanza
+from f5_config_parser.stanza.gtm_server import GTMServerStanza

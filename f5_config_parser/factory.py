@@ -18,6 +18,7 @@ from f5_config_parser.stanza import (
     HTTPSMonitorStanza,
     WideIPStanza,
     GTMPoolStanza,
+    GTMServerStanza,
 )
 
 
@@ -162,6 +163,7 @@ class StanzaFactory:
             ("net", "vlan"): VlanStanza,
             ("gtm", "wideip", "a"): WideIPStanza,
             ("gtm", "pool", "a"): GTMPoolStanza,
+            ("gtm", "server"): GTMServerStanza,
             ("security", "protocol-inspection", "compliance-objects"): CliAdminPartitionsStanza,
         }
         stanza_class = registry.get(prefix, GenericStanza)

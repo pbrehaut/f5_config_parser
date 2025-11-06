@@ -322,6 +322,12 @@ class ConfigStanza:
         self._dependents = None
         self._dependency_map = None
 
+    def reset_all_relations(self):
+        """Reset dependencies, dependents, and dependency map cache"""
+        self._dependencies = None
+        self._dependents = None
+        self._dependency_map = None
+
     @property
     def parsed_config(self) -> Dict[str, Any]:
         """Get parsed configuration (automatically parses if needed)"""

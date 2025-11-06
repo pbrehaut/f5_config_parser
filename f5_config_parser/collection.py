@@ -365,6 +365,11 @@ class StanzaCollection:
                     return False
         return True
 
+    def reset_all_stanza_relations(self):
+        """Reset dependencies and dependents for all stanzas in the collection."""
+        for stanza in self.stanzas:
+            stanza.reset_all_relations()
+
     def resolve_object_by_name(self, object_name: str, scope_prefix: Tuple[str, ...]):
         """
         Resolve an object name within a specific scope (e.g., all ltm profiles).
