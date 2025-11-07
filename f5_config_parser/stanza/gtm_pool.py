@@ -17,10 +17,13 @@ class GTMPoolStanza(ConfigStanza):
         if members and isinstance(members, dict):
             for member_key in members.keys():
                 # Split on ':' and take the first part (server name)
-                server_name = member_key.split(':')[0]
+                server_name, virtual_server_name = member_key.split(':')
                 server_path = collection.resolve_object_by_name(server_name, ('gtm', 'server'))
+                virtual_server_path = collection.resolve_object_by_name(virtual_server_name, ('ltm', 'virtual'))
                 if server_path:
                     dependency_paths.append(server_path)
+                if virtual_server_path:
+                    dependency_paths.append(virtual_server_path)
 
         return dependency_paths
 
