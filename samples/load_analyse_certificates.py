@@ -1,4 +1,4 @@
-from f5_config_parser import load_collection_with_certificates
+from f5_config_parser import load_collection_from_archive
 import re
 
 # Input file paths - replace with your actual file paths
@@ -6,7 +6,7 @@ INPUT_FILE = r"/path/to/your/f5_config_directory"
 TAR_FILE = r"/path/to/your/f5_config_archive.tar"
 
 # Load the F5 configuration along with certificate data
-all_stanzas = load_collection_with_certificates(INPUT_FILE, TAR_FILE)
+all_stanzas = load_collection_from_archive(config_path=INPUT_FILE, archive_path=TAR_FILE)
 
 # Example 1: Extract all certificate objects and their OCSP URIs
 # Filter to get only certificate objects from the configuration
